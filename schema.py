@@ -13,3 +13,4 @@ class MessaggioIoT(BaseModel):
     timestamp: str
     dato_rilevato: Any 
     unita_misura: Optional[str] = None
+    immagine_url: Optional[str] = None

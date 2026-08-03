@@ -4,11 +4,14 @@ import time
 import queue
 import threading
 import logging
+from typing import Any
 from typing import TypedDict, List, Dict, Any, Optional
-
 import paho.mqtt.client as mqtt
 from dotenv import load_dotenv
-
+import base64
+from langchain_core.messages import HumanMessage
+import requests
+from langchain_ollama import ChatOllama
 from langgraph.graph import StateGraph, END
 from langchain_ollama import OllamaLLM
 from langchain_core.prompts import PromptTemplate
@@ -26,6 +29,7 @@ MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
 MQTT_TOPIC_IN = os.getenv("MQTT_TOPIC_IN", "smartcity/sensori/#")
 
 llm = OllamaLLM(model="llama3.2", base_url="http://localhost:11434", format="json")
+vlm = ChatOllama(model="moondream", base_url="http://localhost:11434")
 gestore_memoria = MemoriaSpazioTemporale(finestra_secondi=10)
 gestore_registro = RegistroDispositivi(timeout_secondi=300)
 
@@ -75,6 +79,38 @@ class SmartCityState(TypedDict):
 # 2. I NODI (Workers)
 def nodo_investigatore(state: SmartCityState) -> SmartCityState:
     print(f"\n[NODO 1: INVESTIGATORE] Analizzo la zona: {state['zona']}")
+
+    contesto = state["contesto_eventi"]
+    for evento in contesto:
+        if "immagine_url" in evento and evento["immagine_url"]:
+            print(f"[VLM] Rilevato URL Immagine Remota nell'evento del sensore {evento.get('id_dispositivo')}! Inizio download...")
+            url_immagine = evento["immagine_url"]
+            
+            try:
+                risposta_http = requests.get(url_immagine, timeout=5)
+                risposta_http.raise_for_status()
+                
+                image_b64 = base64.b64encode(risposta_http.content).decode("utf-8")
+                print("[VLM] Download completato. Risveglio Moondream per l'analisi visiva...")
+                
+                messaggio = HumanMessage(
+                    content=[
+                        {"type": "text", "text": "Sei un analista di sicurezza urbano. Descrivi brevemente cosa vedi in questa immagine. Ci sono situazioni di pericolo, incidenti o armi?"},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}}
+                    ]
+                )
+                
+                risposta_vlm = vlm.invoke([messaggio])
+                descrizione_visiva = risposta_vlm.content
+                print(f"[VLM] Report Visivo Generato: {descrizione_visiva}")
+                
+                evento["analisi_telecamera_vlm"] = descrizione_visiva
+                break 
+                
+            except requests.exceptions.RequestException as e:
+                print(f"[VLM] Errore nel download dell'immagine remota: {e}")
+            except Exception as e:
+                print(f"[VLM] Errore durante l'analisi visiva: {e}")
     try:
         risultato = analisi_chain.invoke({
             "nome_zona": state["zona"],
@@ -89,7 +125,7 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
         state["analisi_json"] = {"stato_zona": "ERRORE", "livello_confidenza": "BASSO"}
     return state
 
-def decide_dopo_router(state: SmartCityState) -> str:
+def decide_dopo_router(state: SmartCityState) -> Any:
     analisi = state.get("analisi_json", {})
     if analisi.get("livello_confidenza") == "ALTO":
         return "comandante"
@@ -100,7 +136,7 @@ def nodo_router(state: SmartCityState) -> SmartCityState:
     zona = state["zona"]
     analisi = state.get("analisi_json") or {}
     
-    dato_mancante = analisi.get("dispositivo_richiesto_per_conferma")
+    dato_mancante = analisi.get("tipo_dispositivo_richiesto")
 
     tipo_richiesto = str(dato_mancante).lower() if dato_mancante else "nessuno"
     id_richiesto = str(analisi.get("id_dispositivo_richiesto", "nessuno")).strip()
