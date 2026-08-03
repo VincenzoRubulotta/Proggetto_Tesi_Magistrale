@@ -2,7 +2,7 @@ import redis
 
 class RegistroDispositivi:
     def __init__(self, host='localhost', port=6379, timeout_secondi=300):
-        self.r = redis.Redis(host=host, port=port, decode_responses=True, protocol=2)
+        self.r = redis.Redis(host=host, port=port, decode_responses=True)
         
         self.timeout_secondi = timeout_secondi
 

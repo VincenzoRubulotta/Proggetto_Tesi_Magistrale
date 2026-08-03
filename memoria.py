@@ -6,7 +6,7 @@ import time
 class MemoriaSpazioTemporale:
     def __init__(self, host='localhost', port=6379, finestra_secondi=10):
         self.finestra_secondi = finestra_secondi
-        self.r = redis.Redis(host=host, port=port, decode_responses=True, protocol=2)
+        self.r = redis.Redis(host=host, port=port, decode_responses=True)
 
     def _estrai_timestamp_evento(self, ts_str):
         try:

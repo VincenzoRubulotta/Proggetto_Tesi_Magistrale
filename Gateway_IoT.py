@@ -37,9 +37,15 @@ def on_message(client_instance, userdata, msg):
             "dispositivi_attivi": dispositivi_attivi,
             "analisi_json": None
         }
-        
-        r.rpush("smartcity:coda_lavori", json.dumps(stato_iniziale))
-        print(f"[GATEWAY] Messaggio validato e salvato in coda Redis per {zona}!")
+
+        if r.set(f"lock_analisi:{zona}", "1", nx=True, ex=15):
+            r.rpush("smartcity:coda_lavori", json.dumps(stato_iniziale))
+            
+            r.ltrim("smartcity:coda_lavori", -10, -1)
+            
+            print(f"[GATEWAY] Messaggio salvato. Lock attivato per {zona}!")
+        else:
+            print(f"[GATEWAY] Ignoro evento per {zona}: indagine AI già in corso.")
         
     except json.JSONDecodeError as e:
         logging.error(f"Payload malformato: {e}")

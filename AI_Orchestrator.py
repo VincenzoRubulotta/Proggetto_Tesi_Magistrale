@@ -10,7 +10,7 @@ import paho.mqtt.client as mqtt
 from dotenv import load_dotenv
 
 from langgraph.graph import StateGraph, END
-from langchain_community.llms import Ollama
+from langchain_ollama import OllamaLLM
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 import redis
@@ -25,7 +25,7 @@ MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
 MQTT_TOPIC_IN = os.getenv("MQTT_TOPIC_IN", "smartcity/sensori/#")
 
-llm = Ollama(model="llama3.2", base_url="http://localhost:11434", format="json")
+llm = OllamaLLM(model="llama3.2", base_url="http://localhost:11434", format="json")
 gestore_memoria = MemoriaSpazioTemporale(finestra_secondi=10)
 gestore_registro = RegistroDispositivi(timeout_secondi=300)
 
