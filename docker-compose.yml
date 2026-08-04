@@ -16,6 +16,8 @@ services:
       - "5000:5000"
     volumes:
       - ./archivio_foto:/app/archivio_foto
+    environment:
+      - PYTHONUNBUFFERED=1 # Sblocca i log
     depends_on:
       - redis-db
 
@@ -26,6 +28,7 @@ services:
     environment:
       - REDIS_HOST=redis-db 
       - MQTT_BROKER=host.docker.internal 
+      - PYTHONUNBUFFERED=1 # Sblocca i log
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -37,6 +40,7 @@ services:
     command: python AI_Orchestrator.py
     environment:
       - REDIS_HOST=redis-db
+      - PYTHONUNBUFFERED=1 # Sblocca i log
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
