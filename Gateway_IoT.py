@@ -25,7 +25,7 @@ REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 
 WORKERS_COUNT = int(os.getenv("WORKERS_COUNT", 3))
 
-r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=redis, password=REDIS_PASSWORD,decode_responses=True)
+r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, password=REDIS_PASSWORD,decode_responses=True)
 
 gestore_memoria = MemoriaSpazioTemporale(host=REDIS_HOST, port=REDIS_PORT, finestra_secondi=10)
 gestore_registro = RegistroDispositivi(host=REDIS_HOST, port=REDIS_PORT, timeout_secondi=300)
