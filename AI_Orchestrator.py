@@ -31,8 +31,8 @@ MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
 MQTT_TOPIC_IN = os.getenv("MQTT_TOPIC_IN", "smartcity/sensori/#")
 
 json_parser = JsonOutputParser()
-llm = OllamaLLM(model="llama3.2", base_url="http://localhost:11434", format="json")
-vlm = ChatOllama(model="moondream", base_url="http://localhost:11434")
+llm = OllamaLLM(model="llama3.2", base_url="http://host.docker.internal:11434", format="json")
+vlm = ChatOllama(model="moondream", base_url="http://host.docker.internal:11434")
 gestore_memoria = MemoriaSpazioTemporale(finestra_secondi=10)
 gestore_registro = RegistroDispositivi(timeout_secondi=300)
 

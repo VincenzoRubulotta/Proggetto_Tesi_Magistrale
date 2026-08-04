@@ -1,0 +1,10 @@
+paho-mqtt
+redis
+python-dotenv
+pydantic
+flask
+requests
+langchain-core
+langchain-ollama
+langgraph
+ollama

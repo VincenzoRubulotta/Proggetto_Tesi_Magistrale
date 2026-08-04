@@ -17,7 +17,15 @@ MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
 MQTT_TOPIC_ALLARMI = "smartcity/sensori/#"
 MQTT_TOPIC_HEARTBEAT = "smartcity/heartbeat/#"
 
-r = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+REDIS_DB = int(os.getenv("REDIS_DB", 0))
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
+
+WORKERS_COUNT = int(os.getenv("WORKERS_COUNT", 3))
+
+r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=redis, password=REDIS_PASSWORD,decode_responses=True)
 
 gestore_memoria = MemoriaSpazioTemporale(finestra_secondi=10)
 gestore_registro = RegistroDispositivi(timeout_secondi=300)

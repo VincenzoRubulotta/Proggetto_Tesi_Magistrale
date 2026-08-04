@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  redis-db:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    restart: always
+
+  storage:
+    build: .
+    command: python server_immagini.py
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./archivio_foto:/app/archivio_foto
+    depends_on:
+      - redis-db
+
+  gateway:
+    build: .
+    command: python Gateway_IoT.py
+    environment:
+      - REDIS_HOST=redis-db 
+      - MQTT_BROKER=host.docker.internal 
+    depends_on:
+      - storage
+      
+  orchestrator:
+    build: .
+    command: python AI_Orchestrator.py
+    environment:
+      - REDIS_HOST=redis-db
+    depends_on:
+      - gateway
