@@ -29,12 +29,14 @@ load_dotenv()
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
 MQTT_TOPIC_IN = os.getenv("MQTT_TOPIC_IN", "smartcity/sensori/#")
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 
 json_parser = JsonOutputParser()
 llm = OllamaLLM(model="llama3.2", base_url="http://host.docker.internal:11434", format="json")
 vlm = ChatOllama(model="moondream", base_url="http://host.docker.internal:11434")
-gestore_memoria = MemoriaSpazioTemporale(finestra_secondi=10)
-gestore_registro = RegistroDispositivi(timeout_secondi=300)
+gestore_memoria = MemoriaSpazioTemporale(host=REDIS_HOST, port=REDIS_PORT, finestra_secondi=10)
+gestore_registro = RegistroDispositivi(host=REDIS_HOST, port=REDIS_PORT, timeout_secondi=300)
 
 # --- PROMPT DEL NODO 1 ---
 template_smart_city = """Sei il Cervello Analitico del Digital Twin di una Smart City.
@@ -290,7 +292,7 @@ workflow.add_conditional_edges("router", decide_dopo_router)
 
 app_smart_city = workflow.compile()
 
-r = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=True)
 
 NUMERO_WORKER_PARALLELI = 3  
 executor = ThreadPoolExecutor(max_workers=NUMERO_WORKER_PARALLELI)
