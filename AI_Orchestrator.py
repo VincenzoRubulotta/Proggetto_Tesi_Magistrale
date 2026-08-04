@@ -94,19 +94,20 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
                 image_b64 = base64.b64encode(risposta_http.content).decode("utf-8")
                 print("[VLM] Download completato. Risveglio Moondream per l'analisi visiva...")
                 
-                print("[VLM] Download completato. Risveglio Moondream per l'analisi visiva...")
-                
-                risposta_vlm = ollama.chat(
-                    model='moondream',
-                    messages=[{
-                        'role': 'user',
-                        'content': 'Sei un analista di sicurezza urbano. Descrivi brevemente cosa vedi in questa immagine. Ci sono situazioni di pericolo, incidenti o armi?',
-                        'images': [image_b64] 
-                    }]
+                # Creiamo il messaggio per LangChain usando l'inglese per aiutare Moondream
+                messaggio = HumanMessage(
+                    content=[
+                        {"type": "text", "text": "You are a security analyst. Describe exactly what you see in this image. Are there any accidents, hazards, vehicles, or people?"},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}}
+                    ]
                 )
                 
-                descrizione_visiva = risposta_vlm['message']['content'].strip()
-                print(f"👁️ [VLM] Report Visivo Generato: {descrizione_visiva}")
+                # Invochiamo il VLM tramite LangChain (così LangSmith traccia tutto!)
+                risposta_vlm = vlm.invoke([messaggio])
+                
+                # Estraiamo il contenuto testuale
+                descrizione_visiva = risposta_vlm.content.strip()
+                print(f"[VLM] Report Visivo Generato: {descrizione_visiva}")
                 
                 evento["analisi_telecamera_vlm"] = descrizione_visiva
                 
