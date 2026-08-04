@@ -31,6 +31,8 @@ MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
 MQTT_TOPIC_IN = os.getenv("MQTT_TOPIC_IN", "smartcity/sensori/#")
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+REDIS_DB = int(os.getenv("REDIS_DB", 0))
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 
 json_parser = JsonOutputParser()
 llm = OllamaLLM(model="llama3.2", base_url="http://host.docker.internal:11434", format="json")
@@ -292,7 +294,7 @@ workflow.add_conditional_edges("router", decide_dopo_router)
 
 app_smart_city = workflow.compile()
 
-r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=True)
+r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
 
 NUMERO_WORKER_PARALLELI = 3  
 executor = ThreadPoolExecutor(max_workers=NUMERO_WORKER_PARALLELI)
