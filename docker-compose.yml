@@ -1,15 +1,17 @@
 version: '3.8'
 
 services:
+  # 1. Il Database Redis (Immagine ufficiale)
   redis-db:
     image: redis:alpine
     ports:
       - "6380:6379"
     restart: always
 
+  # 2. Storage Immagini
   storage:
     build: .
-    command: python server_immagini.py
+    command: python Storage_Immagini.py
     ports:
       - "5000:5000"
     volumes:
@@ -17,19 +19,25 @@ services:
     depends_on:
       - redis-db
 
+  # 3. Gateway IoT
   gateway:
     build: .
     command: python Gateway_IoT.py
     environment:
       - REDIS_HOST=redis-db 
       - MQTT_BROKER=host.docker.internal 
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - storage
-      
+
+  # 4. Orchestratore AI
   orchestrator:
     build: .
     command: python AI_Orchestrator.py
     environment:
       - REDIS_HOST=redis-db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - gateway
