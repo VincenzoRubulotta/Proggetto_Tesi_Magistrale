@@ -184,11 +184,71 @@ def nodo_router(state: SmartCityState) -> SmartCityState:
         
     return state
 
-def nodo_comandante(state: SmartCityState) -> SmartCityState:
-    print(f"\n[NODO 3: COMANDANTE] Intervento di Emergenza Richiesto per {state['zona']}!")
-    gestore_registro.r.delete(f"smartcity:escalation:{state['zona']}")
-    print("Qui configureremo il secondo LLM per decidere l'azione finale.")
-    return state
+def nodo_comandante(evento):
+    """
+    Nodo 3: COMANDANTE
+    Legge il report, valuta le risorse IoT disponibili e decide l'intervento tattico.
+    Se non c'è reale pericolo, annulla l'emergenza per non sprecare risorse.
+    """
+    zona = evento.get("zona", "Sconosciuta")
+    contesto_eventi = evento.get("contesto_eventi", [])
+    analisi = evento.get("analisi_json", {})
+    dispositivi_attivi = evento.get("dispositivi_attivi", [])
+    
+    coordinate = "Non specificate"
+    if contesto_eventi and "posizione" in contesto_eventi[0]:
+        coord = contesto_eventi[0]["posizione"].get("coordinate")
+        if coord:
+            coordinate = f"Latitudine: {coord.get('latitudine')}, Longitudine: {coord.get('longitudine')}"
+
+    print(f"\n[NODO 3: COMANDANTE] Valutazione Intervento Strategico per {zona}...")
+    
+    prompt_comandante = f"""Sei il Comandante Operativo delle Forze di Sicurezza e Soccorso della Smart City.
+Stai valutando una potenziale emergenza.
+
+DATI DELL'EVENTO:
+- Zona: {zona}
+- Coordinate GPS: {coordinate}
+
+REPORT DELL'INVESTIGATORE AI:
+- Motivazione e Contesto Visivo: {analisi.get('motivazione_analisi', 'Nessuna descrizione')}
+
+DISPOSITIVI TATTICI ONLINE (DISPONIBILI IN ZONA/LIMITROFI):
+{dispositivi_attivi}
+
+IL TUO OBIETTIVO STRATEGICO E TATTICO:
+1. VALUTAZIONE GRAVITÀ: Analizza il report. C'è un pericolo reale? O si tratta di un falso allarme / situazione innocua? Il tuo dovere è NON sprecare risorse pubbliche.
+2. FORZE UMANE: Se l'intervento è strettamente necessario, scegli chi dispiegare tra ["POLIZIA", "AMBULANZA", "VIGILI_DEL_FUOCO", "PROTEZIONE_CIVILE"]. Se la situazione NON richiede intervento, scrivi "NESSUNO".
+3. SUPPORTO CYBER-FISICO: Se mandi unità umane, dirotta i dispositivi (es. DRONE) per supporto. Se NON mandi unità umane, puoi usare un drone per un controllo passivo di routine, oppure scrivere "NESSUNO" per chiudere totalmente il caso.
+
+Rispondi ESCLUSIVAMENTE in formato JSON con questa esatta struttura:
+{{
+    "unita_intervento_umano": ["Elenco delle forze da inviare. Scrivi NESSUNO se non c'è emergenza"],
+    "dispositivi_tattici_attivati": ["Elenco ID dispositivi da usare (es. DRONE_POLIZIA_01). Scrivi NESSUNO se non servono"],
+    "ordine_operativo": "Messaggio radio per le unità (es. ordini di ingaggio) OPPURE motivazione dell'annullamento (es. 'Nessun intervento richiesto, falso allarme confermato. Chiudere l'incidente.')."
+}}
+"""
+    
+    try:
+        # Invochiamo il LLM forzando la risposta JSON
+        risposta_llm = llm.invoke(prompt_comandante)
+        decisione = json_parser.invoke(risposta_llm)
+        
+        print("\n==================================================")
+        print("ORDINE DEL COMANDANTE")
+        print(f"Target          : {zona} ({coordinate})")
+        print(f"Unità Umane     : {', '.join(decisione.get('unita_intervento_umano', []))}")
+        print(f"Supporto IoT    : {', '.join(decisione.get('dispositivi_tattici_attivati', []))}")
+        print(f"Messaggio Radio : {decisione.get('ordine_operativo', '')}")
+        print("==================================================\n")
+        
+        evento["ordine_comandante"] = decisione
+        
+    except Exception as e:
+        print(f"[COMANDANTE] Errore critico di dispiegamento: {e}")
+        evento["ordine_comandante"] = {"errore": "Impossibile generare l'ordine"}
+
+    return evento
 
 # 3. Router Logic)
 def decide_prossimo_nodo(state: SmartCityState) -> str:
