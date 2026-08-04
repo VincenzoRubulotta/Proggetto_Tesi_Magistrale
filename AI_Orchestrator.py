@@ -310,7 +310,7 @@ print(f"In ascolto continuo sulla coda Redis 'smartcity:coda_lavori' con {NUMERO
 
 try:
     while True:
-        risultato_redis = r.blpop("smartcity:coda_lavori", timeout=0) 
+        risultato_redis = r.blpop("smartcity:coda_lavori", timeout=2) 
         
         if risultato_redis:
             _, payload_stringa = risultato_redis
