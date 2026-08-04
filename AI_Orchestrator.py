@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 import base64
 from langchain_core.messages import HumanMessage
 import requests
-from langchain_ollama import ChatOllama
+from langchain_ollama import ollama
 from langgraph.graph import StateGraph, END
 from langchain_ollama import OllamaLLM
 from langchain_core.prompts import PromptTemplate
@@ -93,19 +93,23 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
                 image_b64 = base64.b64encode(risposta_http.content).decode("utf-8")
                 print("[VLM] Download completato. Risveglio Moondream per l'analisi visiva...")
                 
-                messaggio = HumanMessage(
-                    content=[
-                        {"type": "text", "text": "Sei un analista di sicurezza urbano. Descrivi brevemente cosa vedi in questa immagine. Ci sono situazioni di pericolo, incidenti o armi?"},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}}
-                    ]
+                print("[VLM] Download completato. Risveglio Moondream per l'analisi visiva...")
+                
+                risposta_vlm = ollama.chat(
+                    model='moondream',
+                    messages=[{
+                        'role': 'user',
+                        'content': 'Sei un analista di sicurezza urbano. Descrivi brevemente cosa vedi in questa immagine. Ci sono situazioni di pericolo, incidenti o armi?',
+                        'images': [image_b64] 
+                    }]
                 )
                 
-                risposta_vlm = vlm.invoke([messaggio])
-                descrizione_visiva = risposta_vlm.content
-                print(f"[VLM] Report Visivo Generato: {descrizione_visiva}")
+                descrizione_visiva = risposta_vlm['message']['content'].strip()
+                print(f"👁️ [VLM] Report Visivo Generato: {descrizione_visiva}")
                 
                 evento["analisi_telecamera_vlm"] = descrizione_visiva
-                break 
+                
+                break
                 
             except requests.exceptions.RequestException as e:
                 print(f"[VLM] Errore nel download dell'immagine remota: {e}")
