@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 import base64
 from langchain_core.messages import HumanMessage
 import requests
+from langchain_ollama import ChatOllama
 import ollama
 from langgraph.graph import StateGraph, END
 from langchain_ollama import OllamaLLM
