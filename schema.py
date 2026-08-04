@@ -14,3 +14,11 @@ class MessaggioIoT(BaseModel):
     dato_rilevato: Any 
     unita_misura: Optional[str] = None
     immagine_url: Optional[str] = None
+
+class SegnaleDiVita(BaseModel):
+    id_dispositivo: str = Field(..., description="L'identificativo univoco (es. DRONE_001)")
+    nome_dispositivo: str
+    tipo_dispositivo: str
+    posizione: PosizioneDispositivo
+    batteria: Optional[int] = Field(None, description="Percentuale batteria")
+    stato: Optional[str] = Field("attivo", description="Stato operativo del dispositivo")

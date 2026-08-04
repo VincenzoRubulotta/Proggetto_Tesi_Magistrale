@@ -5,7 +5,7 @@ import redis
 import paho.mqtt.client as mqtt
 from dotenv import load_dotenv
 
-from schema import MessaggioIoT, ValidationError
+from schema import MessaggioIoT, ValidationError,SegnaleDiVita
 from memoria import MemoriaSpazioTemporale
 from registro import RegistroDispositivi  
 
@@ -14,7 +14,8 @@ load_dotenv()
 
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
-MQTT_TOPIC_IN = os.getenv("MQTT_TOPIC_IN", "smartcity/sensori/#")
+MQTT_TOPIC_ALLARMI = "smartcity/sensori/#"
+MQTT_TOPIC_HEARTBEAT = "smartcity/heartbeat/#"
 
 r = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
 
@@ -22,30 +23,37 @@ gestore_memoria = MemoriaSpazioTemporale(finestra_secondi=10)
 gestore_registro = RegistroDispositivi(timeout_secondi=300)
 
 def on_message(client_instance, userdata, msg):
+    topic = msg.topic
     try:
         dati_grezzi = json.loads(msg.payload.decode("utf-8"))
-        messaggio_validato = MessaggioIoT(**dati_grezzi)
-        dati_puliti = messaggio_validato.model_dump()
-
-        gestore_registro.aggiorna_dispositivo(dati_puliti)
-        zona, contesto_aggiornato = gestore_memoria.aggiungi_e_pulisci(dati_puliti)
-        dispositivi_attivi = gestore_registro.ottieni_dispositivi_attivi(zona)
-
-        stato_iniziale = {
-            "zona": zona,
-            "contesto_eventi": contesto_aggiornato,
-            "dispositivi_attivi": dispositivi_attivi,
-            "analisi_json": None
-        }
-
-        if r.set(f"lock_analisi:{zona}", "1", nx=True, ex=15):
-            r.rpush("smartcity:coda_lavori", json.dumps(stato_iniziale))
+        
+        if topic.startswith("smartcity/heartbeat/"):
+            messaggio_validato = SegnaleDiVita(**dati_grezzi)
+            dati_puliti = messaggio_validato.model_dump()
+            gestore_registro.aggiorna_dispositivo(dati_puliti)
+            print(f"[HEARTBEAT] Aggiornato sulla mappa: {messaggio_validato.id_dispositivo} ({messaggio_validato.tipo_dispositivo})")
             
-            r.ltrim("smartcity:coda_lavori", -10, -1)
-            
-            print(f"[GATEWAY] Messaggio salvato. Lock attivato per {zona}!")
-        else:
-            print(f"[GATEWAY] Ignoro evento per {zona}: indagine AI già in corso.")
+        elif topic.startswith("smartcity/sensori/"):
+            messaggio_validato = MessaggioIoT(**dati_grezzi)
+            dati_puliti = messaggio_validato.model_dump()
+
+            gestore_registro.aggiorna_dispositivo(dati_puliti)
+            zona, contesto_aggiornato = gestore_memoria.aggiungi_e_pulisci(dati_puliti)
+            dispositivi_attivi = gestore_registro.ottieni_dispositivi_attivi(zona)
+
+            stato_iniziale = {
+                "zona": zona,
+                "contesto_eventi": contesto_aggiornato,
+                "dispositivi_attivi": dispositivi_attivi,
+                "analisi_json": None
+            }
+
+            if r.set(f"lock_analisi:{zona}", "1", nx=True, ex=15):
+                r.rpush("smartcity:coda_lavori", json.dumps(stato_iniziale))
+                r.ltrim("smartcity:coda_lavori", -10, -1)
+                print(f"[ALLARME] Messaggio salvato. Lock attivato per {zona}!")
+            else:
+                print(f"[GATEWAY] Ignoro evento per {zona}: indagine AI già in corso.")
         
     except json.JSONDecodeError as e:
         logging.error(f"Payload malformato: {e}")
@@ -59,5 +67,5 @@ client.on_message = on_message
 
 print("\nAvvio Gateway IoT (Ascolto MQTT -> Redis)...")
 client.connect(MQTT_BROKER, MQTT_PORT, 60)
-client.subscribe(MQTT_TOPIC_IN)
+client.subscribe([(MQTT_TOPIC_ALLARMI, 0), (MQTT_TOPIC_HEARTBEAT, 0)])
 client.loop_forever()
