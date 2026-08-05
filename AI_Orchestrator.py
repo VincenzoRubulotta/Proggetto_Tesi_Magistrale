@@ -51,18 +51,18 @@ DISPOSITIVI ATTUALMENTE ONLINE E DISPONIBILI:
 {dispositivi_attivi}
 
 IL TUO OBIETTIVO LOGICO:
-Valuta gli eventi seguendo questa rigorosa gerarchia di priorità:
-1. EMERGENZA CONFERMATA: Se i dati forniscono una prova inequivocabile di un'emergenza (es. "INCIDENTE_GRAVE", fiamme, blocco stradale), non hai alcun vuoto sensoriale. Imposta lo stato_zona su "CRITICO", il livello_confidenza su "ALTO" e richiedi "NESSUNO".
-2. VUOTO SENSORIALE: Se rilevi un'anomalia ambigua, abbassa la confidenza a "MEDIO" o "BASSO" e richiedi esplicitamente l'ID di un ALTRO dispositivo online per verificare.
-3. SENSORI ESAURITI: Se hai già dati provenienti da più sensori diversi (es. sia telecamera che microfono) e c'è ancora un'anomalia, DEVI prendere una decisione. Imposta il livello_confidenza su "ALTO" e richiedi "NESSUNO" per sbloccare l'intervento dei soccorsi.
+Valuta gli eventi e incrocia i dati dei sensori con i report visivi, seguendo questa gerarchia:
+1. FALSO ALLARME (PRIORITÀ MASSIMA): Se il sensore di testo segnala un pericolo (es. "veicolo_sospetto", "arma"), MA l'analisi visiva della telecamera descrive chiaramente una scena innocua e normale (es. un cane, una bicicletta, persone che passeggiano), DEVI smentire il sensore. Si tratta di un falso positivo. Imposta stato_zona su "NORMALE", confidenza su "ALTO" e chiedi NESSUNO.
+2. EMERGENZA CONFERMATA: Se i dati e la visione forniscono prove inequivocabili di un'emergenza (es. armi vere, incidenti, fiamme), imposta lo stato_zona su "CRITICO", il livello_confidenza su "ALTO" e richiedi "NESSUNO".
+3. VUOTO SENSORIALE: Se rilevi un'anomalia ambigua e l'immagine non è chiara, abbassa la confidenza a "MEDIO" o "BASSO" e richiedi esplicitamente l'ID di un ALTRO dispositivo online per verificare.
 
 Rispondi ESCLUSIVAMENTE in formato JSON usando questa esatta struttura:
 {{
     "stato_zona": "NORMALE" oppure "ANOMALIA" oppure "CRITICO",
     "livello_confidenza": "ALTO", "MEDIO" o "BASSO",
-    "motivazione_analisi": "Spiega cosa hai rilevato e perché",
-    "tipo_dispositivo_richiesto": "Scrivi il tipo di dispositivo che vuoi usare per colmare il vuoto (es. telecamera). Scrivi NESSUNO se la confidenza è ALTA.",
-    "id_dispositivo_richiesto": "Scrivi l'ID ESATTO del dispositivo scelto tra quelli ONLINE (es. ID_CAM_001). Scrivi NESSUNO se non serve nulla."
+    "motivazione_analisi": "Spiega il tuo ragionamento, specificando se stai smentendo un falso allarme o confermando un pericolo.",
+    "tipo_dispositivo_richiesto": "Scrivi il tipo di dispositivo. Scrivi NESSUNO se la confidenza è ALTA.",
+    "id_dispositivo_richiesto": "Scrivi l'ID ESATTO del dispositivo scelto tra quelli ONLINE. Scrivi NESSUNO se non serve nulla."
 }}
 """
 prompt = PromptTemplate(template=template_smart_city, input_variables=["nome_zona", "contesto_eventi", "dispositivi_attivi"])
