@@ -1,3 +1,18 @@
+```plaintext
+/PROGGETTO_TESI_MAGISTRALE
+├── .env                   # Variabili d'ambiente (configurazioni MQTT, Redis, LangChain, ecc.)
+├── docker-compose.yml     # Configurazione dei 4 servizi containerizzati e delle reti
+├── Dockerfile             # Istruzioni per la build dell'immagine Python universale
+├── requirements.txt       # Dipendenze del progetto (MQTT, LangChain, Flask, Redis, ecc.)
+├── Gateway_IoT.py         # Microservizio 1: Intercetta i sensori MQTT e scrive su Redis
+├── Storage_Immagini.py    # Microservizio 2: Server Flask per upload/download file locali
+├── AI_Orchestrator.py     # Microservizio 3: Cervello AI con LangGraph, Llama 3.2 e Moondream
+├── memoria.py             # Modulo condiviso: Gestione della memoria spazio-temporale
+├── registro.py            # Modulo condiviso: Mappatura dei dispositivi IoT attivi
+├── schema.py              # Modelli dati Pydantic per la validazione degli input
+└── README.md              # Questo file di documentazione
+```
+
 
 ## 1. Prerequisiti (Host Machine)
 Prima di avviare l'infrastruttura Docker, assicurati di avere i seguenti servizi installati e configurati sul tuo PC fisico (Host).
