@@ -128,6 +128,7 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
             except Exception as e:
                 print(f"[VLM] Errore durante l'analisi visiva: {e}")
     try:
+        eventi_testo_pulito = ""
         for ev in state["contesto_eventi"]:
             eventi_testo_pulito += f"- Dispositivo: {ev.get('nome_dispositivo', 'Sconosciuto')} ({ev.get('tipo_dispositivo', 'Sconosciuto')})\n"
             if "analisi_telecamera_vlm" in ev:
