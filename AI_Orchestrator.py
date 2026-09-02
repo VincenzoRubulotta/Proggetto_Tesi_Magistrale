@@ -178,23 +178,24 @@ def nodo_router(state: SmartCityState) -> SmartCityState:
 
     if id_richiesto.lower() not in ["nessuno", "null", "none"]:
         target_trovato = None
+        id_pulito = None
+
         for disp in state["dispositivi_attivi"]:
-            if id_richiesto in disp:
-                target_trovato = id_richiesto
+            if id_richiesto.upper() in disp.upper():
+                target_trovato = disp
+                id_pulito = disp.split(" ")[0].strip()
                 break
         
-        if target_trovato:
-            print(f"Trovato {target_trovato}. Invio comando MQTT!")
-            topic = f"smartcity/comandi/{target_trovato}"
+        if target_trovato and id_pulito:
+            print(f"Trovato {id_pulito}. Invio comando MQTT!")
+            topic = f"smartcity/comandi/{id_pulito}"
             payload = json.dumps({
                 "comando": "RICHIEDI_DATO_EMERGENZA", 
                 "motivo": analisi.get("motivazione_analisi", "Motivo non specificato")
             })
             client_pub.publish(topic, payload) 
         else:
-            print(f"Nessun sensore di tipo '{tipo_richiesto}' attivo.")
-    else:
-        print("⏸L'IA non ha richiesto dati supplementari.")
+            print(f"Nessun sensore corrispondente a '{id_richiesto}' trovato tra quelli attivi.")
         
     return state
 
