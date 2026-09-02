@@ -42,31 +42,32 @@ gestore_registro = RegistroDispositivi(host=REDIS_HOST, port=REDIS_PORT, timeout
 
 # --- PROMPT DEL NODO 1 ---
 template_smart_city = """Sei il Cervello Analitico del Digital Twin di una Smart City.
-Stai monitorando la zona urbana: {nome_zona}.
+Stai monitorando la zona urbana: {zona}.
 
-Considera SEMPRE la 'nome_zona' fornita nel JSON come un dato di fatto assoluto e inconfutabile. Non mettere mai in dubbio la localizzazione dell'evento.
-
-Ecco gli eventi IoT registrati negli ultimi 120 secondi:
+Ecco il resoconto degli eventi IoT registrati negli ultimi 120 secondi:
 {contesto_eventi}
-
-ATTENZIONE CRITICA: Le descrizioni dell'analisi visiva 'analisi_telecamera_vlm' sono in lingua INGLESE (es. 'engulfed by flames' significa 'avvolto dalle fiamme' ed è una grave emergenza). Devi obbligatoriamente tradurle e comprenderle prima di prendere la tua decisione!
 
 DISPOSITIVI ATTUALMENTE ONLINE E DISPONIBILI:
 {dispositivi_attivi}
 
 IL TUO OBIETTIVO LOGICO:
-Valuta gli eventi e incrocia i dati dei sensori con i report visivi, seguendo questa gerarchia:
-1. SMENTITA FALSO ALLARME: Se un sensore segnala un'anomalia, ma l'analisi visiva non rileva alcun pericolo e descrive una situazione tranquilla, smentisci il sensore. Imposta stato_zona su "NORMALE", confidenza su "ALTO" e richiedi NESSUNO.
-2. EMERGENZA CONFERMATA: Se i dati dei sensori e la descrizione visiva confermano inequivocabilmente un pericolo o un incidente reale, imposta stato_zona su "CRITICO", confidenza su "ALTO" e richiedi NESSUNO.
-3. CONTESTO AMBIGUO: Se i dati sono contrastanti o le immagini non sono chiare per prendere una decisione definitiva, abbassa la confidenza a "MEDIO" o "BASSO" e richiedi esplicitamente l'ID di un ALTRO dispositivo online per verificare.
+Valuta gli eventi seguendo queste REGOLE ASSOLUTE:
 
-Rispondi ESCLUSIVAMENTE in formato JSON usando questa esatta struttura:
+1. TRADUZIONE OBBLIGATORIA: Le descrizioni visive (VLM) sono in INGLESE. Devi prima tradurle mentalmente in italiano e focalizzarti sui fatti.
+2. TOLLERANZA ZERO SULL'AMBIGUITÀ: Se nelle descrizioni visive leggi chiaramente di veicoli in fiamme ('fire', 'flames', 'engulfed') o incidenti gravi ('crushed', 'accident', 'debris'), la situazione NON è ambigua. È un'emergenza reale.
+3. EMERGENZA CONFERMATA: Se c'è evidenza visiva di incidente o incendio, ignora eventuali discrepanze di altri sensori. Imposta IMMEDIATAMENTE stato_zona su "CRITICO", confidenza su "ALTO" e id_dispositivo_richiesto su "NESSUNO".
+4. SMENTITA FALSO ALLARME: Se i sensori segnalano un'anomalia, ma l'analisi visiva descrive esplicitamente una situazione tranquilla, imposta stato_zona su "NORMALE".
+5. CONTESTO AMBIGUO: SOLO se le immagini mancano o i testi sono incomprensibili, imposta confidenza a "MEDIO" e richiedi un ALTRO dispositivo.
+
+Rispondi ESCLUSIVAMENTE in formato JSON usando questa esatta struttura ordinata (NON USARE MAI `null`):
 {{
+    "traduzione_e_fatti": "Traduci brevemente in italiano le descrizioni visive ed elenca i fatti nudi e crudi.",
+    "pericoli_rilevati": ["elenco", "dei", "pericoli", "rilevati", "oppure vuoto se nessuno"],
     "stato_zona": "NORMALE" oppure "ANOMALIA" oppure "CRITICO",
     "livello_confidenza": "ALTO", "MEDIO" o "BASSO",
-    "motivazione_analisi": "Spiega il tuo ragionamento, specificando se stai smentendo un falso allarme o confermando un pericolo.",
+    "motivazione_analisi": "Spiegazione basata ESCLUSIVAMENTE sui fatti appena elencati.",
     "tipo_dispositivo_richiesto": "Scrivi il tipo di dispositivo. Scrivi NESSUNO se la confidenza è ALTA.",
-    "id_dispositivo_richiesto": "Scrivi l'ID ESATTO del dispositivo scelto tra quelli ONLINE. Scrivi NESSUNO se non serve nulla."
+    "id_dispositivo_richiesto": "Scrivi l'ID ESATTO del dispositivo. Scrivi NESSUNO se la confidenza è ALTA."
 }}
 """
 prompt = PromptTemplate(template=template_smart_city, input_variables=["nome_zona", "contesto_eventi", "dispositivi_attivi"])
@@ -127,6 +128,14 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
             except Exception as e:
                 print(f"[VLM] Errore durante l'analisi visiva: {e}")
     try:
+        for ev in state["contesto_eventi"]:
+            eventi_testo_pulito += f"- Dispositivo: {ev.get('nome_dispositivo', 'Sconosciuto')} ({ev.get('tipo_dispositivo', 'Sconosciuto')})\n"
+            if "analisi_telecamera_vlm" in ev:
+                eventi_testo_pulito += f"  Analisi Visiva (VLM): {ev['analisi_telecamera_vlm']}\n"
+            if "dato_rilevato" in ev:
+                eventi_testo_pulito += f"  Dato Sensore: {ev['dato_rilevato']}\n"
+            eventi_testo_pulito += "\n"
+        
         risultato = analisi_chain.invoke({
             "nome_zona": state["zona"],
             "contesto_eventi": json.dumps(state["contesto_eventi"], ensure_ascii=False),
