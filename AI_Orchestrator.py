@@ -67,8 +67,8 @@ Rispondi ESCLUSIVAMENTE in formato JSON usando questa esatta struttura ordinata 
     "stato_zona": "Inserisci esattamente uno di questi tre valori: NORMALE, ANOMALIA oppure CRITICO",
     "livello_confidenza": "Inserisci esattamente uno di questi tre valori: ALTO, MEDIO oppure BASSO",
     "motivazione_analisi": "Spiegazione basata ESCLUSIVAMENTE sui fatti appena elencati.",
-    "tipo_dispositivo_richiesto": "Scrivi il tipo di dispositivo. Scrivi NESSUNO se la confidenza è ALTA.",
-    "id_dispositivo_richiesto": "Scrivi l'ID ESATTO del dispositivo. Scrivi NESSUNO se la confidenza è ALTA."
+    "tipo_dispositivo_richiesto": "Se la confidenza è MEDIO o BASSO, scrivi il tipo di un dispositivo scegliendolo dalla lista 'DISPOSITIVI ATTUALMENTE ONLINE'. Se ALTO scrivi NESSUNO.",
+    "id_dispositivo_richiesto": "Se la confidenza è MEDIO o BASSO, COPIA QUI l'ID ESATTO di un dispositivo dalla lista 'DISPOSITIVI ATTUALMENTE ONLINE' (non scegliere lo stesso sensore che ha generato l'evento). VIETATO scrivere NESSUNO se sei incerto!"
 }}
 """
 prompt = PromptTemplate(template=template_smart_city, input_variables=["nome_zona", "contesto_eventi", "dispositivi_attivi"])
