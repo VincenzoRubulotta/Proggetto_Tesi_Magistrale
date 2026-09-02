@@ -52,9 +52,9 @@ DISPOSITIVI ATTUALMENTE ONLINE E DISPONIBILI:
 
 IL TUO OBIETTIVO LOGICO:
 Valuta gli eventi e incrocia i dati dei sensori con i report visivi, seguendo questa gerarchia:
-1. FALSO ALLARME (PRIORITÀ MASSIMA): Se il sensore di testo segnala un pericolo (es. "veicolo_sospetto", "arma"), MA l'analisi visiva della telecamera descrive chiaramente una scena innocua e normale (es. un cane, una bicicletta, persone che passeggiano), DEVI smentire il sensore. Si tratta di un falso positivo. Imposta stato_zona su "NORMALE", confidenza su "ALTO" e chiedi NESSUNO.
-2. EMERGENZA CONFERMATA: Se i dati e la visione forniscono prove inequivocabili di un'emergenza (es. armi vere, incidenti, fiamme), imposta lo stato_zona su "CRITICO", il livello_confidenza su "ALTO" e richiedi "NESSUNO".
-3. VUOTO SENSORIALE: Se rilevi un'anomalia ambigua e l'immagine non è chiara, abbassa la confidenza a "MEDIO" o "BASSO" e richiedi esplicitamente l'ID di un ALTRO dispositivo online per verificare.
+1. SMENTITA FALSO ALLARME: Se un sensore segnala un'anomalia, ma l'analisi visiva non rileva alcun pericolo e descrive una situazione tranquilla, smentisci il sensore. Imposta stato_zona su "NORMALE", confidenza su "ALTO" e richiedi NESSUNO.
+2. EMERGENZA CONFERMATA: Se i dati dei sensori e la descrizione visiva confermano inequivocabilmente un pericolo o un incidente reale, imposta stato_zona su "CRITICO", confidenza su "ALTO" e richiedi NESSUNO.
+3. CONTESTO AMBIGUO: Se i dati sono contrastanti o le immagini non sono chiare per prendere una decisione definitiva, abbassa la confidenza a "MEDIO" o "BASSO" e richiedi esplicitamente l'ID di un ALTRO dispositivo online per verificare.
 
 Rispondi ESCLUSIVAMENTE in formato JSON usando questa esatta struttura:
 {{
