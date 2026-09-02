@@ -28,7 +28,7 @@ class MemoriaSpazioTemporale:
         
         self.r.zremrangebyscore(chiave_redis, '-inf', soglia_vecchiaia)
 
-        self.r.expire(chiave_redis, 60)
+        self.r.expire(chiave_redis, 60 + self.finestra_secondi)
 
         eventi_salvati_stringa = self.r.zrange(chiave_redis, 0, -1)
         
