@@ -54,10 +54,11 @@ IL TUO OBIETTIVO LOGICO:
 Valuta gli eventi seguendo queste REGOLE ASSOLUTE:
 
 1. TRADUZIONE OBBLIGATORIA: Le descrizioni visive (VLM) sono in INGLESE. Devi prima tradurle mentalmente in italiano e focalizzarti sui fatti.
-2. TOLLERANZA ZERO SULL'AMBIGUITÀ: Se nelle descrizioni visive leggi chiaramente di veicoli in fiamme ('fire', 'flames', 'engulfed') o incidenti gravi ('crushed', 'accident', 'debris'), la situazione NON è ambigua. È un'emergenza reale.
-3. EMERGENZA CONFERMATA: Se c'è evidenza visiva di incidente o incendio, ignora eventuali discrepanze di altri sensori. Imposta IMMEDIATAMENTE stato_zona su "CRITICO", confidenza su "ALTO" e id_dispositivo_richiesto su "NESSUNO".
-4. SMENTITA FALSO ALLARME: Se i sensori segnalano un'anomalia, ma l'analisi visiva descrive esplicitamente una situazione tranquilla, imposta stato_zona su "NORMALE".
-5. CONTESTO AMBIGUO: SOLO se le immagini mancano o i testi sono incomprensibili, imposta confidenza a "MEDIO" e richiedi un ALTRO dispositivo.
+2. RISPETTO DELLA REALTÀ DEI DATI: Non inventare MAI descrizioni visive o interventi di droni/telecamere se nel campo {contesto_eventi} non è presente un URL di immagine reale o un'analisi VLM associata. Se ci sono solo dati di microfoni o sensori ambientali, basa le tue deduzioni unicamente su di essi.
+3. TOLLERANZA ZERO SULL'AMBIGUITÀ: Se nelle descrizioni visive leggi chiaramente di veicoli in fiamme ('fire', 'flames', 'engulfed') o incidenti gravi ('crushed', 'accident', 'debris'), la situazione NON è ambigua. È un'emergenza reale.
+4. EMERGENZA CONFERMATA: Se c'è evidenza visiva di incidente o incendio, ignora eventuali discrepanze di altri sensori. Imposta IMMEDIATAMENTE stato_zona su "CRITICO", confidenza su "ALTO" e id_dispositivo_richiesto su "NESSUNO".
+5. SMENTITA FALSO ALLARME: Se i sensori segnalano un'anomalia, ma l'analisi visiva descrive esplicitamente una situazione tranquilla, imposta stato_zona su "NORMALE".
+6. CONTESTO AMBIGUO: SOLO se le immagini mancano o i testi sono incomprensibili, imposta confidenza a "MEDIO" e richiedi un ALTRO dispositivo.
 
 Rispondi ESCLUSIVAMENTE in formato JSON usando questa esatta struttura ordinata (NON USARE MAI `null`):
 {{
