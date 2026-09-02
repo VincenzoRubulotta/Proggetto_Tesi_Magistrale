@@ -138,11 +138,14 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
                 eventi_testo_pulito += f"  Dato Sensore: {ev['dato_rilevato']}\n"
             eventi_testo_pulito += "\n"
         
+        print(f"\n[DEBUG INVESTIGATORE] Dispositivi attivi passati all'LLM: {state['dispositivi_attivi']}")
+
         risultato = analisi_chain.invoke({
             "nome_zona": state["zona"],
             "contesto_eventi": json.dumps(state["contesto_eventi"], ensure_ascii=False),
             "dispositivi_attivi": "\n".join(state["dispositivi_attivi"]) if state["dispositivi_attivi"] else "Nessun dispositivo disponibile."
         })
+        print(f"[DEBUG INVESTIGATORE] Risposta grezza LLM (Analisi JSON): {risultato}")
         print(f"Esito: {risultato.get('stato_zona')} (Confidenza: {risultato.get('livello_confidenza')})")
 
         state["analisi_json"] = risultato 
@@ -160,6 +163,9 @@ def nodo_router(state: SmartCityState) -> SmartCityState:
 
     tipo_richiesto = str(dato_mancante).lower() if dato_mancante else "nessuno"
     id_richiesto = str(analisi.get("id_dispositivo_richiesto", "nessuno")).strip()
+
+    print(f"[DEBUG ROUTER] L'IA ha chiesto il tipo: '{tipo_richiesto}' con ID esatto: '{id_richiesto}'")
+    print(f"[DEBUG ROUTER] Dispositivi disponibili nello stato: {state.get('dispositivi_attivi')}")
 
     # Protocollo Escalation
     chiave_escalation = f"smartcity:escalation:{zona}"
@@ -196,6 +202,7 @@ def nodo_router(state: SmartCityState) -> SmartCityState:
             client_pub.publish(topic, payload) 
         else:
             print(f"Nessun sensore corrispondente a '{id_richiesto}' trovato tra quelli attivi.")
+            analisi["livello_confidenza"] = "ALTO"
         
     return state
 
@@ -295,6 +302,15 @@ def decide_prossimo_nodo(state: SmartCityState) -> str:
         
     return "fine"
 
+def decide_dopo_router(state: SmartCityState) -> str:
+    analisi = state.get("analisi_json", {})
+    confidenza = analisi.get("livello_confidenza", "ALTO")
+    
+    if confidenza == "ALTO":
+        return "comandante"
+    
+    return END
+
 # 4. ASSEMBLAGGIO DEL GRAFO
 workflow = StateGraph(SmartCityState)
 workflow.add_node("investigatore", nodo_investigatore)
@@ -314,7 +330,14 @@ workflow.add_conditional_edges(
 
 
 workflow.add_edge("comandante", END)
-workflow.add_edge("router", END)
+workflow.add_conditional_edges(
+    "router",
+    decide_dopo_router,
+    {
+        "comandante": "comandante",
+        "end": END
+    }
+)
 
 app_smart_city = workflow.compile()
 
