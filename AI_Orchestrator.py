@@ -42,7 +42,7 @@ gestore_registro = RegistroDispositivi(host=REDIS_HOST, port=REDIS_PORT, timeout
 
 # --- PROMPT DEL NODO 1 ---
 template_smart_city = """Sei il Cervello Analitico del Digital Twin di una Smart City.
-Stai monitorando la zona urbana: {zona}.
+Stai monitorando la zona urbana: {nome_zona}.
 
 Ecco il resoconto degli eventi IoT registrati negli ultimi 120 secondi:
 {contesto_eventi}
