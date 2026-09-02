@@ -92,11 +92,6 @@ class SmartCityState(TypedDict):
 def nodo_investigatore(state: SmartCityState) -> SmartCityState:
     print(f"\n[NODO 1: INVESTIGATORE] Analizzo la zona: {state['zona']}")
 
-    dispositivi_online = gestore_registro.ottieni_dispositivi_attivi_per_zona(state['zona'])
-    if not dispositivi_online:
-        dispositivi_online = state.get("dispositivi_attivi", [])
-    
-    state["dispositivi_attivi"] = dispositivi_online
     contesto = state["contesto_eventi"]
     for evento in contesto:
         if "immagine_url" in evento and evento["immagine_url"]:
