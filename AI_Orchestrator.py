@@ -63,8 +63,8 @@ Rispondi ESCLUSIVAMENTE in formato JSON usando questa esatta struttura ordinata 
 {{
     "traduzione_e_fatti": "Traduci brevemente in italiano le descrizioni visive ed elenca i fatti nudi e crudi.",
     "pericoli_rilevati": ["elenco", "dei", "pericoli", "rilevati", "oppure vuoto se nessuno"],
-    "stato_zona": "NORMALE" oppure "ANOMALIA" oppure "CRITICO",
-    "livello_confidenza": "ALTO", "MEDIO" o "BASSO",
+    "stato_zona": "Inserisci esattamente uno di questi tre valori: NORMALE, ANOMALIA oppure CRITICO",
+    "livello_confidenza": "Inserisci esattamente uno di questi tre valori: ALTO, MEDIO oppure BASSO",
     "motivazione_analisi": "Spiegazione basata ESCLUSIVAMENTE sui fatti appena elencati.",
     "tipo_dispositivo_richiesto": "Scrivi il tipo di dispositivo. Scrivi NESSUNO se la confidenza è ALTA.",
     "id_dispositivo_richiesto": "Scrivi l'ID ESATTO del dispositivo. Scrivi NESSUNO se la confidenza è ALTA."
@@ -149,12 +149,6 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
         print(f"[ERRORE LLM]: {e}")
         state["analisi_json"] = {"stato_zona": "ERRORE", "livello_confidenza": "BASSO"}
     return state
-
-def decide_dopo_router(state: SmartCityState) -> Any:
-    analisi = state.get("analisi_json", {})
-    if analisi.get("livello_confidenza") == "ALTO":
-        return "comandante"
-    return END
   
 def nodo_router(state: SmartCityState) -> SmartCityState:
     print(f"\n[NODO 2: ROUTER] Ricerca dati supplementari in corso...")
@@ -318,7 +312,7 @@ workflow.add_conditional_edges(
 
 
 workflow.add_edge("comandante", END)
-workflow.add_conditional_edges("router", decide_dopo_router)
+workflow.add_edge("router", END)
 
 app_smart_city = workflow.compile()
 
