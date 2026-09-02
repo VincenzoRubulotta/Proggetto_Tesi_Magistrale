@@ -58,15 +58,25 @@ Valuta gli eventi seguendo queste REGOLE ASSOLUTE:
 3. EMERGENZA (ALTO): Se c'è evidenza visiva certa (telecamera/drone) di fiamme o incidenti, imposta stato su CRITICO, confidenza su ALTO e chiedi dispositivo NESSUNO.
 4. INCERTEZZA (MEDIO/BASSO): Se c'è un allarme acustico (es. boato, microfono) ma MANCANO conferme visive, lo stato è ANOMALIA e la confidenza è MEDIO. In questo caso, DEVI obbligatoriamente copiare l'ID di una telecamera o drone dalla lista dispositivi per chiedere un controllo visivo.
 
-ESEMPIO DI COMPORTAMENTO CORRETTO IN CASO DI DUBBIO (Solo audio, senza immagini):
 {{
-    "traduzione_e_fatti": "Il microfono rileva un forte boato metallico.",
-    "pericoli_rilevati": ["Possibile esplosione"],
+    "traduzione_e_fatti": "Il microfono rileva un rumore anomalo.",
+    "pericoli_rilevati": ["Rumore Anomalo"],
     "stato_zona": "ANOMALIA",
     "livello_confidenza": "MEDIO",
     "motivazione_analisi": "Allarme acustico grave, ma necessito di conferma visiva per evitare falsi allarmi.",
     "tipo_dispositivo_richiesto": "telecamera",
-    "id_dispositivo_richiesto": "CAM_CENTRO"
+    "id_dispositivo_richiesto": "CAM_1"
+}}
+
+ESEMPIO 2 - COMPORTAMENTO IN CASO DI CERTEZZA (Verifica visiva completata o emergenza palese):
+{{
+    "traduzione_e_fatti": "La telecamera mostra un cantiere con un escavatore al lavoro. Non ci sono incidenti.",
+    "pericoli_rilevati": [],
+    "stato_zona": "NORMALE",
+    "livello_confidenza": "ALTO",
+    "motivazione_analisi": "L'immagine conferma che i rumori derivano da normali lavori di cantiere. Nessun pericolo.",
+    "tipo_dispositivo_richiesto": "NESSUNO",
+    "id_dispositivo_richiesto": "NESSUNO"
 }}
 
 Rispondi ESCLUSIVAMENTE in formato JSON usando questa struttura:
@@ -77,7 +87,7 @@ Rispondi ESCLUSIVAMENTE in formato JSON usando questa struttura:
     "livello_confidenza": "ALTO, MEDIO o BASSO",
     "motivazione_analisi": "Il tuo ragionamento logico.",
     "tipo_dispositivo_richiesto": "Scrivi il tipo (es. telecamera o drone). Scrivi NESSUNO solo se confidenza è ALTO.",
-    "id_dispositivo_richiesto": "Copia l'ID di un dispositivo dalla lista (es. CAM_NORD). Scrivi NESSUNO solo se confidenza è ALTO."
+    "id_dispositivo_richiesto": "Copia l'ID di un dispositivo dalla lista (es. CAM_2). Scrivi NESSUNO solo se confidenza è ALTO."
 }}
 """
 prompt = PromptTemplate(template=template_smart_city, input_variables=["nome_zona", "contesto_eventi", "dispositivi_attivi"])
