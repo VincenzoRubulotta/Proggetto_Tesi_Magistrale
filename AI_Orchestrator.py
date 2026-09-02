@@ -53,22 +53,31 @@ DISPOSITIVI ATTUALMENTE ONLINE E DISPONIBILI:
 IL TUO OBIETTIVO LOGICO:
 Valuta gli eventi seguendo queste REGOLE ASSOLUTE:
 
-1. TRADUZIONE OBBLIGATORIA: Le descrizioni visive (VLM) sono in INGLESE. Devi prima tradurle mentalmente in italiano e focalizzarti sui fatti.
-2. RISPETTO DELLA REALTÀ DEI DATI: Non inventare MAI descrizioni visive o interventi di droni/telecamere se nel campo {contesto_eventi} non è presente un URL di immagine reale o un'analisi VLM associata. Se ci sono solo dati di microfoni o sensori ambientali, basa le tue deduzioni unicamente su di essi.
-3. TOLLERANZA ZERO SULL'AMBIGUITÀ: Se nelle descrizioni visive leggi chiaramente di veicoli in fiamme ('fire', 'flames', 'engulfed') o incidenti gravi ('crushed', 'accident', 'debris'), la situazione NON è ambigua. È un'emergenza reale.
-4. EMERGENZA CONFERMATA: Se c'è evidenza visiva di incidente o incendio, ignora eventuali discrepanze di altri sensori. Imposta IMMEDIATAMENTE stato_zona su "CRITICO", confidenza su "ALTO" e id_dispositivo_richiesto su "NESSUNO".
-5. SMENTITA FALSO ALLARME: Se i sensori segnalano un'anomalia, ma l'analisi visiva descrive esplicitamente una situazione tranquilla, imposta stato_zona su "NORMALE".
-6. OBBLIGO DI ISPEZIONE IN CONTESTO AMBIGUO: Se la situazione non è chiara (es. allarme acustico senza immagini), DEVI impostare la confidenza su "MEDIO" e obbligatoriamente indicare un ID valido di una telecamera o drone presente nella lista dei dispositivi attivi nei campi "tipo_dispositivo_richiesto" e "id_dispositivo_richiesto". NON scrivere mai "NESSUNO" se la confidenza è media o bassa.
+1. TRADUZIONE: Traduci le descrizioni visive (VLM) dall'inglese all'italiano.
+2. ADERENZA AI DATI: Usa SOLO i dati forniti. Non inventare immagini inesistenti.
+3. EMERGENZA (ALTO): Se c'è evidenza visiva certa (telecamera/drone) di fiamme o incidenti, imposta stato su CRITICO, confidenza su ALTO e chiedi dispositivo NESSUNO.
+4. INCERTEZZA (MEDIO/BASSO): Se c'è un allarme acustico (es. boato, microfono) ma MANCANO conferme visive, lo stato è ANOMALIA e la confidenza è MEDIO. In questo caso, DEVI obbligatoriamente copiare l'ID di una telecamera o drone dalla lista dispositivi per chiedere un controllo visivo.
 
-Rispondi ESCLUSIVAMENTE in formato JSON usando questa esatta struttura ordinata (NON USARE MAI `null`):
+ESEMPIO DI COMPORTAMENTO CORRETTO IN CASO DI DUBBIO (Solo audio, senza immagini):
 {{
-    "traduzione_e_fatti": "Traduci brevemente in italiano le descrizioni visive ed elenca i fatti nudi e crudi.",
-    "pericoli_rilevati": ["elenco", "dei", "pericoli", "rilevati", "oppure vuoto se nessuno"],
-    "stato_zona": "Inserisci esattamente uno di questi tre valori: NORMALE, ANOMALIA oppure CRITICO",
-    "livello_confidenza": "Inserisci esattamente uno di questi tre valori: ALTO, MEDIO oppure BASSO",
-    "motivazione_analisi": "Spiegazione basata ESCLUSIVAMENTE sui fatti appena elencati.",
-    "tipo_dispositivo_richiesto": "Se la confidenza è MEDIO o BASSO, scrivi il tipo di un dispositivo scegliendolo dalla lista 'DISPOSITIVI ATTUALMENTE ONLINE'. Se ALTO scrivi NESSUNO.",
-    "id_dispositivo_richiesto": "Se la confidenza è MEDIO o BASSO, COPIA QUI l'ID ESATTO di un dispositivo dalla lista 'DISPOSITIVI ATTUALMENTE ONLINE' (non scegliere lo stesso sensore che ha generato l'evento). VIETATO scrivere NESSUNO se sei incerto!"
+    "traduzione_e_fatti": "Il microfono rileva un forte boato metallico.",
+    "pericoli_rilevati": ["Possibile esplosione"],
+    "stato_zona": "ANOMALIA",
+    "livello_confidenza": "MEDIO",
+    "motivazione_analisi": "Allarme acustico grave, ma necessito di conferma visiva per evitare falsi allarmi.",
+    "tipo_dispositivo_richiesto": "telecamera",
+    "id_dispositivo_richiesto": "CAM_CENTRO"
+}}
+
+Rispondi ESCLUSIVAMENTE in formato JSON usando questa struttura:
+{{
+    "traduzione_e_fatti": "La tua traduzione e i fatti.",
+    "pericoli_rilevati": ["lista pericoli o vuoto"],
+    "stato_zona": "NORMALE, ANOMALIA o CRITICO",
+    "livello_confidenza": "ALTO, MEDIO o BASSO",
+    "motivazione_analisi": "Il tuo ragionamento logico.",
+    "tipo_dispositivo_richiesto": "Scrivi il tipo (es. telecamera o drone). Scrivi NESSUNO solo se confidenza è ALTO.",
+    "id_dispositivo_richiesto": "Copia l'ID di un dispositivo dalla lista (es. CAM_NORD). Scrivi NESSUNO solo se confidenza è ALTO."
 }}
 """
 prompt = PromptTemplate(template=template_smart_city, input_variables=["nome_zona", "contesto_eventi", "dispositivi_attivi"])
