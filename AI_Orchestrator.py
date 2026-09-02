@@ -177,12 +177,12 @@ def nodo_router(state: SmartCityState) -> SmartCityState:
         analisi["livello_confidenza"] = "ALTO" 
         return state
     
-    if id_richiesto.lower() in ["nessuno", "null", "none"] and analisi.get("livello_confidenza") in ["MEDIO", "BASSO"]:
+    if id_richiesto.lower() in ["nessuno", "null", "none", ""] and analisi.get("livello_confidenza") in ["MEDIO", "BASSO"]:
         print("L'IA è incerta ma ha esaurito i sensori da chiamare. Forzo l'Escalation al Comandante!")
         analisi["livello_confidenza"] = "ALTO" 
         return state
 
-    if id_richiesto.lower() not in ["nessuno", "null", "none"]:
+    if id_richiesto.lower() not in ["nessuno", "null", "none", ""]:
         target_trovato = None
         id_pulito = None
 
@@ -309,7 +309,7 @@ def decide_dopo_router(state: SmartCityState) -> str:
     if confidenza == "ALTO":
         return "comandante"
     
-    return END
+    return "fine"
 
 # 4. ASSEMBLAGGIO DEL GRAFO
 workflow = StateGraph(SmartCityState)
@@ -335,7 +335,7 @@ workflow.add_conditional_edges(
     decide_dopo_router,
     {
         "comandante": "comandante",
-        "end": END
+        "fine": END
     }
 )
 
