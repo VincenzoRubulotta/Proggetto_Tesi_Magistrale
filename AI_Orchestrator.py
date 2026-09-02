@@ -44,8 +44,10 @@ gestore_registro = RegistroDispositivi(host=REDIS_HOST, port=REDIS_PORT, timeout
 template_smart_city = """Sei il Cervello Analitico del Digital Twin di una Smart City.
 Stai monitorando la zona urbana: {nome_zona}.
 
-Ecco gli eventi IoT registrati negli ultimi 10 secondi:
+Ecco gli eventi IoT registrati negli ultimi 120 secondi:
 {contesto_eventi}
+
+ATTENZIONE CRITICA: Le descrizioni dell'analisi visiva 'analisi_telecamera_vlm' sono in lingua INGLESE (es. 'engulfed by flames' significa 'avvolto dalle fiamme' ed è una grave emergenza). Devi obbligatoriamente tradurle e comprenderle prima di prendere la tua decisione!"
 
 DISPOSITIVI ATTUALMENTE ONLINE E DISPONIBILI:
 {dispositivi_attivi}
