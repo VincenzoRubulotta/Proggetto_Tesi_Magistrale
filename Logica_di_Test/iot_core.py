@@ -146,7 +146,16 @@ def on_message(client, userdata, msg):
             disp_target = topic_parts[2]
             if disp_target in registro_dispositivi_locali:
                 payload = json.loads(msg.payload.decode())
-                registro_dispositivi_locali[disp_target].elabora_richiesta_agente(payload, client)
+                comando = payload.get("comando")
+                
+                if comando == "RICHIEDI_DATO_EMERGENZA":
+                    registro_dispositivi_locali[disp_target].elabora_richiesta_agente(payload, client)
+                    
+                elif comando == "DISPIEGAMENTO_TATTICO":
+                    print(f"[{disp_target}] Ordine Operativo dal Comandante ricevuto. Dispositivo a disposizione.")
+                else:
+                    print(f"[{disp_target}] Comando sconosciuto o assente.")
+
     except Exception as e:
         print(f"Errore parsing messaggio: {e}")
 

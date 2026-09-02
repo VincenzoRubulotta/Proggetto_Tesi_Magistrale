@@ -288,13 +288,15 @@ def decide_prossimo_nodo(state: SmartCityState) -> str:
     stato_zona = analisi.get("stato_zona", "NORMALE")
     confidenza = analisi.get("livello_confidenza", "ALTO")
     
-    if stato_zona == "NORMALE":
+    if confidenza in ["BASSO", "MEDIO"]:
+        return "router"
+        
+    if stato_zona == "NORMALE" and confidenza == "ALTO":
         return "fine"
-    if stato_zona in ["ANOMALIA", "CRITICO"]:
-        if confidenza in ["BASSO", "MEDIO"]:
-            return "router"
-        elif confidenza == "ALTO":
-            return "comandante"
+        
+    if stato_zona in ["ANOMALIA", "CRITICO"] and confidenza == "ALTO":
+        return "comandante"
+        
     return "fine"
 
 # 4. ASSEMBLAGGIO DEL GRAFO
