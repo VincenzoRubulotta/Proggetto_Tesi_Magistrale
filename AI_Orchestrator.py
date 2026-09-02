@@ -58,8 +58,8 @@ Valuta gli eventi seguendo queste REGOLE ASSOLUTE:
 3. TOLLERANZA ZERO SULL'AMBIGUITÀ: Se nelle descrizioni visive leggi chiaramente di veicoli in fiamme ('fire', 'flames', 'engulfed') o incidenti gravi ('crushed', 'accident', 'debris'), la situazione NON è ambigua. È un'emergenza reale.
 4. EMERGENZA CONFERMATA: Se c'è evidenza visiva di incidente o incendio, ignora eventuali discrepanze di altri sensori. Imposta IMMEDIATAMENTE stato_zona su "CRITICO", confidenza su "ALTO" e id_dispositivo_richiesto su "NESSUNO".
 5. SMENTITA FALSO ALLARME: Se i sensori segnalano un'anomalia, ma l'analisi visiva descrive esplicitamente una situazione tranquilla, imposta stato_zona su "NORMALE".
-6. CONTESTO AMBIGUO: SOLO se le immagini mancano o i testi sono incomprensibili, imposta confidenza a "MEDIO" e richiedi un ALTRO dispositivo.
-
+6. OBBLIGO DI ISPEZIONE IN CONTESTO AMBIGUO: Se la situazione non è chiara (es. allarme acustico senza immagini), DEVI impostare la confidenza su "MEDIO" e obbligatoriamente indicare un ID valido di una telecamera o drone presente nella lista dei dispositivi attivi nei campi "tipo_dispositivo_richiesto" e "id_dispositivo_richiesto". NON scrivere mai "NESSUNO" se la confidenza è media o bassa.
+7. CONDIZIONE PER NESSUN DISPOSITIVO RICHIESTO: Puoi inserire nel campo "id_dispositivo_richiesto" il valore "NESSUNO" se e solo se la confidenza è alta"
 Rispondi ESCLUSIVAMENTE in formato JSON usando questa esatta struttura ordinata (NON USARE MAI `null`):
 {{
     "traduzione_e_fatti": "Traduci brevemente in italiano le descrizioni visive ed elenca i fatti nudi e crudi.",
