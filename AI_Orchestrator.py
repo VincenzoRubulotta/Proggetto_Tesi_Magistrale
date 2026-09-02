@@ -117,7 +117,6 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
                 
                 evento["analisi_telecamera_vlm"] = descrizione_visiva
                 
-                break
                 
             except requests.exceptions.RequestException as e:
                 print(f"[VLM] Errore nel download dell'immagine remota: {e}")
