@@ -37,7 +37,7 @@ REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 json_parser = JsonOutputParser()
 llm = OllamaLLM(model="llama3.2", base_url="http://host.docker.internal:11434", format="json")
 vlm = ChatOllama(model="moondream", base_url="http://host.docker.internal:11434")
-gestore_memoria = MemoriaSpazioTemporale(host=REDIS_HOST, port=REDIS_PORT, finestra_secondi=10)
+gestore_memoria = MemoriaSpazioTemporale(host=REDIS_HOST, port=REDIS_PORT, finestra_secondi=120)
 gestore_registro = RegistroDispositivi(host=REDIS_HOST, port=REDIS_PORT, timeout_secondi=300)
 
 # --- PROMPT DEL NODO 1 ---
@@ -249,11 +249,24 @@ Rispondi ESCLUSIVAMENTE in formato JSON con questa esatta struttura:
         print("==================================================\n")
         
         evento["ordine_comandante"] = decisione
+
+        dispositivi_attivati = decisione.get("dispositivi_tattici_attivati", [])
+        if isinstance(dispositivi_attivati, list):
+            for disp_id in dispositivi_attivati:
+                if disp_id.lower() not in ["nessuno", "null", "none"]:
+                    topic_cmd = f"smartcity/comandi/{disp_id}"
+                    payload_cmd = json.dumps({
+                        "comando": "DISPIEGAMENTO_TATTICO",
+                        "ordine_operativo": decisione.get("ordine_operativo", ""),
+                        "zona_target": zona
+                    })
+                    client_pub.publish(topic_cmd, payload_cmd)
+                    print(f"[MQTT] Ordine operativo inviato al dispositivo: {disp_id}")
         
     except Exception as e:
         print(f"[COMANDANTE] Errore critico di dispiegamento: {e}")
         evento["ordine_comandante"] = {"errore": "Impossibile generare l'ordine"}
-
+    
     return evento
 
 # 3. Router Logic)

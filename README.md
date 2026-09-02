@@ -36,7 +36,7 @@ ollama pull llama3.2
 ollama pull moondream
 ```
 
-⚠️ Configurazione Fondamentale per Docker (Linux):
+Configurazione Fondamentale per Docker (Linux):
 Poiché Ollama deve comunicare con i container Docker, devi abilitare l'ascolto su tutte le interfacce di rete.
 
 Modifica il servizio:
@@ -98,11 +98,9 @@ Nel terminale, naviga nella cartella del progetto ed esegui:
 ```bash
 docker-compose up --build
 ```
-## 5. Arresto del Sistema
-
-Per spegnere in sicurezza la Smart City, vai nel terminale "Cabina di Regia" e premi CTRL+C. I container riceveranno il segnale di terminazione, chiuderanno le connessioni e Redis salverà lo snapshot finale sul disco.
-
-Per rimuovere definitivamente i container arrestati, esegui:
+## 4. Arresto del Sistema
+Per spegnere in sicurezza, vai nel terminale  premi CTRL+C.
+Per rimuovere definitivamente i container esegui:
 
 ```bash
 docker-compose down
