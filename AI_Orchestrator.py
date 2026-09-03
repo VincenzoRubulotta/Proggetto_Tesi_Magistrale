@@ -2,6 +2,7 @@ import os
 import json
 import time
 import queue
+import math
 import threading
 import logging
 from typing import Any
@@ -47,7 +48,7 @@ Stai monitorando la zona urbana: {nome_zona}.
 Ecco il resoconto degli eventi IoT registrati negli ultimi 120 secondi:
 {contesto_eventi}
 
-DISPOSITIVI ATTUALMENTE ONLINE E DISPONIBILI:
+DISPOSITIVI ATTUALMENTE ONLINE (Con Distanza dall'evento, Mobilità, Batteria e Specializzazioni):
 {dispositivi_attivi}
 
 IL TUO OBIETTIVO LOGICO:
@@ -56,17 +57,20 @@ Valuta gli eventi seguendo queste REGOLE ASSOLUTE:
 1. TRADUZIONE: Traduci le descrizioni visive (VLM) dall'inglese all'italiano.
 2. ADERENZA AI DATI: Usa SOLO i dati forniti. Non inventare immagini inesistenti.
 3. EMERGENZA (ALTO): Se c'è evidenza visiva certa (telecamera/drone) di fiamme o incidenti, imposta stato su CRITICO, confidenza su ALTO e chiedi dispositivo NESSUNO.
-4. INCERTEZZA (MEDIO/BASSO): Se c'è un allarme acustico (es. boato, microfono) ma MANCANO conferme visive, lo stato è ANOMALIA e la confidenza è MEDIO. In questo caso, DEVI obbligatoriamente copiare l'ID di una telecamera o drone dalla lista dispositivi per chiedere un controllo visivo.
+4. INCERTEZZA, LOGISTICA E SPECIALIZZAZIONI (MEDIO/BASSO): Se c'è un allarme (es. acustico) ma MANCANO conferme incrociate (es. visive), lo stato è ANOMALIA e la confidenza è MEDIO. In questo caso, DEVI richiedere l'intervento di uno o più dispositivi dalla lista per un controllo supplementare. Scegli i dispositivi più opportuni valutando attentamente:
+   - SPECIALIZZAZIONE: adatta al pericolo sospettato (es. per un'esplosione, scegli un dispositivo specializzato in 'incendi' o 'incidenti').
+   - DISTANZA: preferisci quelli più vicini all'evento.
+   - MOBILITÀ E BATTERIA: se usi un dispositivo mobile (es. drone) per ispezionare l'area, assicurati che la batteria sia sufficiente.
 
 ESEMPIO 1 - COMPORTAMENTO IN CASO DI DUBBIO (Solo audio, senza immagini):
 {{
-    "traduzione_e_fatti": "Il microfono rileva un rumore anomalo.",
-    "pericoli_rilevati": ["Rumore Anomalo"],
+    "traduzione_e_fatti": "Il microfono rileva un forte boato.",
+    "pericoli_rilevati": ["Possibile esplosione"],
     "stato_zona": "ANOMALIA",
     "livello_confidenza": "MEDIO",
-    "motivazione_analisi": "Allarme acustico grave, ma necessito di conferma visiva per evitare falsi allarmi.",
+    "motivazione_analisi": "Allarme acustico grave. Richiedo la telecamera CAM_SUD perché è specializzata nel rilevamento di incendi ed esplosioni.",
     "tipo_dispositivo_richiesto": "telecamera",
-    "id_dispositivo_richiesto": "<INSERISCI_QUI_ID_REALE_DALLA_LISTA>"
+    "id_dispositivo_richiesto": "<INSERISCI_QUI_ID_REALE_DALLA_LISTA_CON_SPECIALIZZAZIONE_ADATTA>"
 }}
 
 ESEMPIO 2 - COMPORTAMENTO IN CASO DI CERTEZZA (Verifica visiva completata o emergenza palese):
@@ -86,9 +90,9 @@ Rispondi ESCLUSIVAMENTE in formato JSON usando questa struttura:
     "pericoli_rilevati": ["lista pericoli o vuoto"],
     "stato_zona": "NORMALE, ANOMALIA o CRITICO",
     "livello_confidenza": "ALTO, MEDIO o BASSO",
-    "motivazione_analisi": "Il tuo ragionamento logico.",
+    "motivazione_analisi": "Il tuo ragionamento logico, specificando PERCHÉ hai scelto un determinato sensore in base alle sue specializzazioni.",
     "tipo_dispositivo_richiesto": "Scrivi il tipo (es. telecamera o drone). Scrivi NESSUNO solo se confidenza è ALTO.",
-    "id_dispositivo_richiesto": "Copia il NOME ESATTO preso ESCLUSIVAMENTE dalla lista 'DISPOSITIVI ATTUALMENTE ONLINE' (non inventare nomi!). Scrivi NESSUNO solo se confidenza è ALTO."
+    "id_dispositivi_richiesti": ["Copia", "qui", "un array di ID esatti presi dalla lista", "oppure un array vuoto [] se ALTO"]
 }}
 """
 prompt = PromptTemplate(template=template_smart_city, input_variables=["nome_zona", "contesto_eventi", "dispositivi_attivi"])
@@ -97,6 +101,17 @@ analisi_chain = prompt | llm | JsonOutputParser()
 client_pub = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 client_pub.connect(MQTT_BROKER, MQTT_PORT, 60)
 client_pub.loop_start()
+
+def calcola_distanza(lat1, lon1, lat2, lon2):
+    """Calcola la distanza in metri tra due coordinate GPS usando la formula di Haversine."""
+    if None in (lat1, lon1, lat2, lon2):
+        return float('inf') 
+    R = 6371000
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = math.sin(dphi/2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda/2)**2
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 # ==========================================================
 # ARCHITETTURA LANGGRAPH: LO STATO E I NODI
@@ -150,6 +165,14 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
                 print(f"[VLM] Errore durante l'analisi visiva: {e}")
     try:
         eventi_testo_pulito = ""
+        lat_evento, lon_evento = None, None
+
+        if state["contesto_eventi"] and "posizione" in state["contesto_eventi"][0]:
+            coord = state["contesto_eventi"][0]["posizione"].get("coordinate")
+            if coord:
+                lat_evento = coord.get("latitudine")
+                lon_evento = coord.get("longitudine")
+        
         for ev in state["contesto_eventi"]:
             eventi_testo_pulito += f"- Dispositivo: {ev.get('nome_dispositivo', 'Sconosciuto')} ({ev.get('tipo_dispositivo', 'Sconosciuto')})\n"
             if "analisi_telecamera_vlm" in ev:
@@ -158,13 +181,29 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
                 eventi_testo_pulito += f"  Dato Sensore: {ev['dato_rilevato']}\n"
             eventi_testo_pulito += "\n"
         
+        dispositivi_formattati = []
+        for disp in state["dispositivi_attivi"]: 
+            lat_disp = disp.get("posizione", {}).get("coordinate", {}).get("latitudine")
+            lon_disp = disp.get("posizione", {}).get("coordinate", {}).get("longitudine")
+            
+            distanza = calcola_distanza(lat_evento, lon_evento, lat_disp, lon_disp)
+            dist_str = f"{distanza:.0f}m" if distanza != float('inf') else "Sconosciuta"
+            
+            mob = "SÌ" if disp.get("is_mobile") else "NO"
+            batt = f"{disp.get('batteria')}%" if disp.get("batteria") else "N/D"
+            spec = ", ".join(disp.get("specializzazioni", []))
+            
+            info = f"- ID: {disp['id_dispositivo']} (Tipo: {disp['tipo_dispositivo']}, Mobile: {mob}, Distanza dall'evento: {dist_str}, Batteria: {batt}, Specializzazioni: [{spec}])"
+            dispositivi_formattati.append(info)
+
         print(f"\n[DEBUG INVESTIGATORE] Dispositivi attivi passati all'LLM: {state['dispositivi_attivi']}")
 
         risultato = analisi_chain.invoke({
             "nome_zona": state["zona"],
             "contesto_eventi": json.dumps(state["contesto_eventi"], ensure_ascii=False),
-            "dispositivi_attivi": "\n".join(state["dispositivi_attivi"]) if state["dispositivi_attivi"] else "Nessun dispositivo disponibile."
+            "dispositivi_attivi": "\n".join(dispositivi_formattati) if dispositivi_formattati else "Nessun dispositivo disponibile."
         })
+        
         print(f"[DEBUG INVESTIGATORE] Risposta grezza LLM (Analisi JSON): {risultato}")
         print(f"Esito: {risultato.get('stato_zona')} (Confidenza: {risultato.get('livello_confidenza')})")
 
@@ -179,13 +218,20 @@ def nodo_router(state: SmartCityState) -> SmartCityState:
     zona = state["zona"]
     analisi = state.get("analisi_json") or {}
     
-    dato_mancante = analisi.get("tipo_dispositivo_richiesto")
+    dispositivi_richiesti = analisi.get("id_dispositivi_richiesti", [])
+    if isinstance(dispositivi_richiesti, str):
+        if dispositivi_richiesti.upper() in ["NESSUNO", "NULL", "NONE", ""]:
+            dispositivi_richiesti = []
+        else:
+            dispositivi_richiesti = [dispositivi_richiesti]
 
-    tipo_richiesto = str(dato_mancante).lower() if dato_mancante else "nessuno"
-    id_richiesto = str(analisi.get("id_dispositivo_richiesto", "nessuno")).strip()
+    print(f"[DEBUG ROUTER] L'IA ha richiesto i dispositivi: {dispositivi_richiesti}")
 
-    print(f"[DEBUG ROUTER] L'IA ha chiesto il tipo: '{tipo_richiesto}' con ID esatto: '{id_richiesto}'")
-    print(f"[DEBUG ROUTER] Dispositivi disponibili nello stato: {state.get('dispositivi_attivi')}")
+    lat_target, lon_target = None, None
+    if state["contesto_eventi"] and "posizione" in state["contesto_eventi"][0]:
+        coord = state["contesto_eventi"][0]["posizione"].get("coordinate")
+        if coord:
+            lat_target, lon_target = coord.get("latitudine"), coord.get("longitudine")
 
     # Protocollo Escalation
     chiave_escalation = f"smartcity:escalation:{zona}"
@@ -193,36 +239,51 @@ def nodo_router(state: SmartCityState) -> SmartCityState:
     gestore_registro.r.expire(chiave_escalation, 60)
     
     if tentativi_dubbio >= 3:
-        print("[ESCALATION] Troppi tentativi falliti! Vado in emergenza!")
+        print("[ESCALATION] Troppi tentativi falliti! Vado in emergenza al Comandante!")
         analisi["livello_confidenza"] = "ALTO" 
         return state
     
-    if id_richiesto.lower() in ["nessuno", "null", "none", ""] and analisi.get("livello_confidenza") in ["MEDIO", "BASSO"]:
-        print("L'IA è incerta ma ha esaurito i sensori da chiamare. Forzo l'Escalation al Comandante!")
+    if not dispositivi_richiesti and analisi.get("livello_confidenza") in ["MEDIO", "BASSO"]:
+        print("[ESCALATION] L'IA è incerta ma ha esaurito i sensori o l'array è vuoto. Forzo l'Escalation al Comandante!")
         analisi["livello_confidenza"] = "ALTO" 
         return state
 
-    if id_richiesto.lower() not in ["nessuno", "null", "none", ""]:
-        target_trovato = None
-        id_pulito = None
+    if dispositivi_richiesti:
+        for id_richiesto in dispositivi_richiesti:
+            if id_richiesto.upper() in ["NESSUNO", "NULL", "NONE"]:
+                continue
 
-        for disp in state["dispositivi_attivi"]:
-            if id_richiesto.upper() in disp.upper():
-                target_trovato = disp
-                id_pulito = disp.split(" ")[0].strip()
-                break
-        
-        if target_trovato and id_pulito:
-            print(f"Trovato {id_pulito}. Invio comando MQTT!")
-            topic = f"smartcity/comandi/{id_pulito}"
-            payload = json.dumps({
-                "comando": "RICHIEDI_DATO_EMERGENZA", 
-                "motivo": analisi.get("motivazione_analisi", "Motivo non specificato")
-            })
-            client_pub.publish(topic, payload) 
-        else:
-            print(f"Nessun sensore corrispondente a '{id_richiesto}' trovato tra quelli attivi.")
-            analisi["livello_confidenza"] = "ALTO"
+            target_disp = None
+
+            for disp in state["dispositivi_attivi"]:
+                if id_richiesto.upper() == disp.get("id_dispositivo", "").upper():
+                    target_disp = disp
+                    break
+
+            if target_disp:
+                    id_pulito = target_disp["id_dispositivo"]
+                    is_mobile = target_disp.get("is_mobile", False)
+                    print(f"[DEBUG ROUTER] Trovato {id_pulito}. Mobile: {is_mobile}. Invio comando MQTT!")
+                    
+                    topic = f"smartcity/comandi/{id_pulito}"
+
+                    comando_payload = {
+                        "comando": "RICHIEDI_DATO_EMERGENZA", 
+                        "motivo": analisi.get("motivazione_analisi", "Verifica supplementare richiesta dall'AI")
+                    }
+                    
+                    if is_mobile and lat_target is not None and lon_target is not None:
+                        comando_payload["azione_tattica"] = "SPOSTAMENTO_RICHIESTO"
+                        comando_payload["target_gps"] = {
+                            "latitudine": lat_target, 
+                            "longitudine": lon_target
+                        }
+                        print(f"[MQTT] -> Aggiunto ordine di spostamento verso {lat_target}, {lon_target} per {id_pulito}")
+                    
+                    client_pub.publish(topic, json.dumps(comando_payload))
+            else:
+                print(f"[DEBUG ROUTER] ATTENZIONE: Sensore '{id_richiesto}' non trovato o offline.")
+                analisi["livello_confidenza"] = "ALTO"
         
     return state
 
@@ -237,67 +298,130 @@ def nodo_comandante(evento):
     analisi = evento.get("analisi_json", {})
     dispositivi_attivi = evento.get("dispositivi_attivi", [])
     
-    coordinate = "Non specificate"
-    if contesto_eventi and "posizione" in contesto_eventi[0]:
-        coord = contesto_eventi[0]["posizione"].get("coordinate")
-        if coord:
-            coordinate = f"Latitudine: {coord.get('latitudine')}, Longitudine: {coord.get('longitudine')}"
+    lat_esatta, lon_esatta = None, None
+
+    for ev in contesto_eventi:
+        if "analisi_telecamera_vlm" in ev and ev.get("posizione") and ev["posizione"].get("coordinate"):
+            lat_esatta = ev["posizione"]["coordinate"].get("latitudine")
+            lon_esatta = ev["posizione"]["coordinate"].get("longitudine")
+            break
+    
+
+    if lat_esatta is None or lon_esatta is None:
+        if contesto_eventi and "posizione" in contesto_eventi[0] and contesto_eventi[0]["posizione"].get("coordinate"):
+            lat_esatta = contesto_eventi[0]["posizione"]["coordinate"].get("latitudine")
+            lon_esatta = contesto_eventi[0]["posizione"]["coordinate"].get("longitudine")
+            
+    coordinate_str = f"Latitudine: {lat_esatta}, Longitudine: {lon_esatta}" if lat_esatta else "Non specificate"
+
+    dispositivi_trigger = list(set([ev.get("id_dispositivo") for ev in contesto_eventi if "id_dispositivo" in ev]))
 
     print(f"\n[NODO 3: COMANDANTE] Valutazione Intervento Strategico per {zona}...")
     
+    dispositivi_formattati = []
+    for disp in dispositivi_attivi:
+        if isinstance(disp, dict):
+            lat_disp = disp.get("posizione", {}).get("coordinate", {}).get("latitudine")
+            lon_disp = disp.get("posizione", {}).get("coordinate", {}).get("longitudine")
+            
+            distanza = calcola_distanza(lat_esatta, lon_esatta, lat_disp, lon_disp)
+            dist_str = f"{distanza:.0f}m" if distanza != float('inf') else "Sconosciuta"
+            
+            mob = "SÌ" if disp.get("is_mobile") else "NO"
+            batt = f"{disp.get('batteria')}%" if disp.get("batteria") else "N/D"
+            spec = ", ".join(disp.get("specializzazioni", []))
+            
+            info = f"- ID: {disp['id_dispositivo']} (Tipo: {disp['tipo_dispositivo']}, Mobile: {mob}, Distanza dal Target: {dist_str}, Batteria: {batt}, Specializzazioni: [{spec}])"
+            dispositivi_formattati.append(info)
+
+    dispositivi_str = "\n".join(dispositivi_formattati) if dispositivi_formattati else "Nessun dispositivo disponibile."
+
     prompt_comandante = f"""Sei il Comandante Operativo delle Forze di Sicurezza e Soccorso della Smart City.
 Stai valutando una potenziale emergenza.
 
 DATI DELL'EVENTO:
 - Zona: {zona}
-- Coordinate GPS: {coordinate}
+- Coordinate GPS: {coordinate_str}
+- Dispositivi che hanno lanciato l'alert: {dispositivi_trigger}
 
 REPORT DELL'INVESTIGATORE AI:
 - Motivazione e Contesto Visivo: {analisi.get('motivazione_analisi', 'Nessuna descrizione')}
 
 DISPOSITIVI TATTICI ONLINE (DISPONIBILI IN ZONA/LIMITROFI):
-{dispositivi_attivi}
+{dispositivi_str}
 
 IL TUO OBIETTIVO STRATEGICO E TATTICO:
-1. VALUTAZIONE GRAVITÀ: Analizza il report. C'è un pericolo reale? O si tratta di un falso allarme / situazione innocua? Il tuo dovere è NON sprecare risorse pubbliche.
-2. FORZE UMANE: Se l'intervento è strettamente necessario, scegli chi dispiegare tra ["POLIZIA", "AMBULANZA", "VIGILI_DEL_FUOCO", "PROTEZIONE_CIVILE"]. Se la situazione NON richiede intervento, scrivi "NESSUNO".
-3. SUPPORTO CYBER-FISICO: Se mandi unità umane, dirotta i dispositivi (es. DRONE) per supporto. Se NON mandi unità umane, puoi usare un drone per un controllo passivo di routine, oppure scrivere "NESSUNO" per chiudere totalmente il caso.
+1. VALUTAZIONE: Redigi una breve descrizione della situazione e dei sensori coinvolti nell'analisi.
+2. FORZE UMANE: Se l'intervento è necessario, scegli chi dispiegare tra ["POLIZIA", "AMBULANZA", "VIGILI_DEL_FUOCO", "PROTEZIONE_CIVILE"]. Se innocuo o falso allarme, scrivi "NESSUNO".
+3. SUPPORTO CYBER-FISICO (IoT): Seleziona i migliori dispositivi dalla lista per il supporto tattico o il monitoraggio dell'area. Valuta attentamente:
+   - SPECIALIZZAZIONE: adatta all'evento (es. droni antincendio, telecamere per incidenti).
+   - DISTANZA: preferisci dispositivi vicini al target.
+   - MOBILITÀ E BATTERIA: invia dispositivi mobili (es. droni) sulle coordinate dell'emergenza SOLO se hanno batteria sufficiente (>20%). Se non serve supporto, scrivi "NESSUNO".
 
-Rispondi ESCLUSIVAMENTE in formato JSON con questa esatta struttura:
+Rispondi ESCLUSIVAMENTE in formato JSON con questa esatta struttura ordinata:
 {{
-    "unita_intervento_umano": ["Elenco delle forze da inviare. Scrivi NESSUNO se non c'è emergenza"],
-    "dispositivi_tattici_attivati": ["Elenco ID dispositivi da usare (es. DRONE_POLIZIA_01). Scrivi NESSUNO se non servono"],
-    "ordine_operativo": "Messaggio radio per le unità (es. ordini di ingaggio) OPPURE motivazione dell'annullamento (es. 'Nessun intervento richiesto, falso allarme confermato. Chiudere l'incidente.')."
+    "descrizione_situazione": "Descrizione riassuntiva ma completa di ciò che sta accadendo basata sull'investigazione (max 3 frasi).",
+    "dispositivi_coinvolti": ["Elenco ID dei dispositivi che hanno rilevato l'anomalia o fornito immagini"],
+    "posizione_esatta": {{
+        "nome_zona": "{zona}",
+        "latitudine": {lat_esatta if lat_esatta else "null"},
+        "longitudine": {lon_esatta if lon_esatta else "null"}
+    }},
+    "unita_intervento_umano": ["Elenco delle forze umane da inviare. Scrivi NESSUNO se non c'è emergenza"],
+    "dispositivi_tattici_attivati": ["Elenco ID dispositivi IoT scelti dalla lista. Scrivi NESSUNO se non servono"],
+    "motivazione_tattica_iot": "Spiega PERCHÉ hai scelto quei specifici dispositivi IoT (valutando specializzazione, distanza e batteria).",
 }}
 """
     
     try:
-        # Invochiamo il LLM forzando la risposta JSON
         risposta_llm = llm.invoke(prompt_comandante)
         decisione = json_parser.invoke(risposta_llm)
         
         print("\n==================================================")
-        print("ORDINE DEL COMANDANTE")
-        print(f"Target          : {zona} ({coordinate})")
+        print("INCIDENT REPORT")
+        print(f"Target          : {decisione.get('posizione_esatta', {}).get('nome_zona')} ({coordinate_str})")
+        print(f"Descrizione     : {decisione.get('descrizione_situazione', '')}")
+        print(f"Sensori Alert   : {', '.join(decisione.get('dispositivi_coinvolti', []))}")
         print(f"Unità Umane     : {', '.join(decisione.get('unita_intervento_umano', []))}")
         print(f"Supporto IoT    : {', '.join(decisione.get('dispositivi_tattici_attivati', []))}")
-        print(f"Messaggio Radio : {decisione.get('ordine_operativo', '')}")
         print("==================================================\n")
         
         evento["ordine_comandante"] = decisione
 
         dispositivi_attivati = decisione.get("dispositivi_tattici_attivati", [])
-        if isinstance(dispositivi_attivati, list):
+        if isinstance(dispositivi_attivati, str):
+            dispositivi_attivati = [dispositivi_attivati]
+
+        if dispositivi_attivati:
             for disp_id in dispositivi_attivati:
-                if disp_id.lower() not in ["nessuno", "null", "none"]:
-                    topic_cmd = f"smartcity/comandi/{disp_id}"
-                    payload_cmd = json.dumps({
-                        "comando": "DISPIEGAMENTO_TATTICO",
-                        "ordine_operativo": decisione.get("ordine_operativo", ""),
-                        "zona_target": zona
-                    })
-                    client_pub.publish(topic_cmd, payload_cmd)
-                    print(f"[MQTT] Ordine operativo inviato al dispositivo: {disp_id}")
+                if disp_id.upper() in ["NESSUNO", "NULL", "NONE", ""]:
+                    continue
+                    
+                id_pulito = disp_id.split(" ")[0].strip()
+                
+                is_mobile = False
+                for d in dispositivi_attivi:
+                    if isinstance(d, dict) and d.get("id_dispositivo", "").upper() == id_pulito.upper():
+                        is_mobile = d.get("is_mobile", False)
+                        break
+
+                topic_cmd = f"smartcity/comandi/{id_pulito}"
+                payload_cmd = {
+                    "comando": "DISPIEGAMENTO_TATTICO",
+                    "ordine_operativo": decisione.get("ordine_operativo", ""),
+                    "zona_target": zona
+                }
+                
+                if is_mobile and lat_esatta is not None and lon_esatta is not None:
+                    payload_cmd["azione_tattica"] = "SPOSTAMENTO_RICHIESTO"
+                    payload_cmd["target_gps"] = {
+                        "latitudine": lat_esatta, 
+                        "longitudine": lon_esatta
+                    }
+                    print(f"[MQTT] -> Aggiunto ordine di spostamento tattico verso {lat_esatta}, {lon_esatta} per {id_pulito}")
+                
+                client_pub.publish(topic_cmd, json.dumps(payload_cmd))
+                print(f"[MQTT] Ordine operativo inviato al dispositivo: {id_pulito}")
         
     except Exception as e:
         print(f"[COMANDANTE] Errore critico di dispiegamento: {e}")
@@ -361,7 +485,13 @@ workflow.add_conditional_edges(
 
 app_smart_city = workflow.compile()
 
-r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
+r = redis.Redis(
+    host=REDIS_HOST, 
+    port=REDIS_PORT, 
+    db=REDIS_DB, 
+    password=REDIS_PASSWORD, 
+    decode_responses=True
+)
 
 NUMERO_WORKER_PARALLELI = 3  
 executor = ThreadPoolExecutor(max_workers=NUMERO_WORKER_PARALLELI)
