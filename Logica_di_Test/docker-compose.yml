@@ -1,0 +1,143 @@
+version: '3.8'
+
+services:
+  mqtt:
+    image: eclipse-mosquitto:latest
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  storage:
+    build: ../
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./Data_Pool:/app/Data_Pool
+
+  orchestrator:
+    build: ../
+    environment:
+      - MQTT_BROKER=mqtt
+      - MQTT_PORT=1883
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+    volumes:
+      - ./Data_Pool:/app/Data_Pool
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - mqtt
+      - redis
+
+  dashboard:
+    build: ../dashboard
+    ports:
+      - "8080:8080"
+    environment:
+      - MQTT_BROKER=mqtt
+    depends_on:
+      - mqtt
+
+  mic_ambientale:
+    build: .
+    stdin_open: true 
+    tty: true     
+    volumes:
+      - ./Data_Pool:/app/Data_Pool
+    environment:
+      - MQTT_BROKER=mqtt
+      - STORAGE_UPLOAD_URL=http://storage:5000/upload
+      - DEVICE_ID=MIC_EST
+      - DEVICE_NAME=Mic_Piazza_Est
+      - DEVICE_TYPE=microfono
+      - IS_MOBILE=False
+      - SPECIALIZATIONS=sirene,esplosioni,rumori_anomali
+      - LATITUDE=37.5112
+      - LONGITUDE=15.0890
+    depends_on:
+      - mqtt
+
+  sensore_temp:
+    build: .
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./Data_Pool:/app/Data_Pool
+    environment:
+      - MQTT_BROKER=mqtt
+      - STORAGE_UPLOAD_URL=http://storage:5000/upload
+      - DEVICE_ID=TEMP_01
+      - DEVICE_NAME=Termometro_Piazza
+      - DEVICE_TYPE=sensore_temperatura
+      - IS_MOBILE=False
+      - SPECIALIZATIONS=incendi,rilevamento_calore
+      - LATITUDE=37.5110
+      - LONGITUDE=15.0880
+    depends_on:
+      - mqtt
+
+  telecamera_fissa:
+    build: .
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./Data_Pool:/app/Data_Pool
+    environment:
+      - MQTT_BROKER=mqtt
+      - STORAGE_UPLOAD_URL=http://storage:5000/upload
+      - DEVICE_ID=CAM_NORD
+      - DEVICE_NAME=Cam_Piazza_Nord
+      - DEVICE_TYPE=telecamera
+      - IS_MOBILE=False
+      - SPECIALIZATIONS=incendi,traffico
+      - LATITUDE=37.5115
+      - LONGITUDE=15.0888
+    depends_on:
+      - mqtt
+      - storage
+
+  drone_01:
+    build: .
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./Data_Pool:/app/Data_Pool
+    environment:
+      - MQTT_BROKER=mqtt
+      - STORAGE_UPLOAD_URL=http://storage:5000/upload
+      - DEVICE_ID=DRONE_01
+      - DEVICE_NAME=Drone_Ricognitore_Alpha
+      - DEVICE_TYPE=drone
+      - IS_MOBILE=True
+      - SPECIALIZATIONS=incidenti,incendi,ricerca_visiva
+      - LATITUDE=37.5125 
+      - LONGITUDE=15.0895
+    depends_on:
+      - mqtt
+      - storage
+
+  drone_02:
+    build: .
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./Data_Pool:/app/Data_Pool
+    environment:
+      - MQTT_BROKER=mqtt
+      - STORAGE_UPLOAD_URL=http://storage:5000/upload
+      - DEVICE_ID=DRONE_02
+      - DEVICE_NAME=Drone_Ricognitore_Beta
+      - DEVICE_TYPE=drone
+      - IS_MOBILE=True
+      - SPECIALIZATIONS=incidenti,incendi,primo_soccorso
+      - LATITUDE=37.5180 
+      - LONGITUDE=15.0950
+    depends_on:
+      - mqtt
+      - storage

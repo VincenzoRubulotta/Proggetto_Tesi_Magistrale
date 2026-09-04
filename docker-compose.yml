@@ -45,3 +45,12 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - gateway
+  
+  dashboard: 
+    build: ./dashboard 
+    ports:
+      - "8080:8080"
+    environment:
+      - MQTT_BROKER=mqtt
+    depends_on:
+      - mqtt
