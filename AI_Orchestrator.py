@@ -284,7 +284,13 @@ def nodo_router(state: SmartCityState) -> SmartCityState:
             target_disp = None
 
             for disp in state["dispositivi_attivi"]:
-                if id_richiesto.upper() == disp.get("id_dispositivo", "").upper():
+                if isinstance(disp, str):
+                    try:
+                        disp = json.loads(disp)
+                    except json.JSONDecodeError:
+                        continue
+                
+                if isinstance(disp, dict) and id_richiesto.upper() == disp.get("id_dispositivo", "").upper():
                     target_disp = disp
                     break
 
