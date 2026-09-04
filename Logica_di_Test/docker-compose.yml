@@ -1,49 +1,10 @@
 version: '3.8'
 
+networks:
+  smartcity_net:
+    external: true
+
 services:
-  mqtt:
-    image: eclipse-mosquitto:latest
-    ports:
-      - "1883:1883"
-      - "9001:9001"
-
-  redis:
-    image: redis:alpine
-    ports:
-      - "6379:6379"
-
-  storage:
-    build: ../
-    ports:
-      - "5000:5000"
-    volumes:
-      - ./Data_Pool:/app/Data_Pool
-
-  orchestrator:
-    build: ../
-    environment:
-      - MQTT_BROKER=mqtt
-      - MQTT_PORT=1883
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=
-    volumes:
-      - ./Data_Pool:/app/Data_Pool
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    depends_on:
-      - mqtt
-      - redis
-
-  dashboard:
-    build: ../dashboard
-    ports:
-      - "8080:8080"
-    environment:
-      - MQTT_BROKER=mqtt
-    depends_on:
-      - mqtt
-
   mic_ambientale:
     build: .
     stdin_open: true 
@@ -60,8 +21,8 @@ services:
       - SPECIALIZATIONS=sirene,esplosioni,rumori_anomali
       - LATITUDE=37.5112
       - LONGITUDE=15.0890
-    depends_on:
-      - mqtt
+    networks:
+      - smartcity_net
 
   sensore_temp:
     build: .
@@ -79,8 +40,8 @@ services:
       - SPECIALIZATIONS=incendi,rilevamento_calore
       - LATITUDE=37.5110
       - LONGITUDE=15.0880
-    depends_on:
-      - mqtt
+    networks:
+      - smartcity_net
 
   telecamera_fissa:
     build: .
@@ -98,9 +59,8 @@ services:
       - SPECIALIZATIONS=incendi,traffico
       - LATITUDE=37.5115
       - LONGITUDE=15.0888
-    depends_on:
-      - mqtt
-      - storage
+    networks:
+      - smartcity_net
 
   drone_01:
     build: .
@@ -118,9 +78,8 @@ services:
       - SPECIALIZATIONS=incidenti,incendi,ricerca_visiva
       - LATITUDE=37.5125 
       - LONGITUDE=15.0895
-    depends_on:
-      - mqtt
-      - storage
+    networks:
+      - smartcity_net
 
   drone_02:
     build: .
@@ -138,6 +97,5 @@ services:
       - SPECIALIZATIONS=incidenti,incendi,primo_soccorso
       - LATITUDE=37.5180 
       - LONGITUDE=15.0950
-    depends_on:
-      - mqtt
-      - storage
+    networks:
+      - smartcity_net

@@ -1,62 +1,76 @@
 version: '3.8'
 
-services:
 
+networks:
+  smartcity_net:
+    name: smartcity_net
+
+services:
   mqtt:
     image: eclipse-mosquitto:latest
     ports:
       - "1883:1883"
       - "9001:9001"
-  # 1. Il Database Redis (Immagine ufficiale)
-  redis-db:
+    networks:
+      - smartcity_net
+
+  redis:
     image: redis:alpine
     ports:
-      - "6380:6379"
-    restart: always
+      - "6379:6379"
+    networks:
+      - smartcity_net
 
-  # 2. Storage Immagini
   storage:
     build: .
     command: python Storage_Immagini.py
     ports:
       - "5000:5000"
     volumes:
-      - ./archivio_foto:/app/archivio_foto
+      - ./Logica_di_Test/Data_Pool:/app/archivio_foto
     environment:
-      - PYTHONUNBUFFERED=1 # Sblocca i log
+      - PYTHONUNBUFFERED=1
+    networks:
+      - smartcity_net
     depends_on:
-      - redis-db
+      - redis
 
-  # 3. Gateway IoT
   gateway:
     build: .
     command: python Gateway_IoT.py
     environment:
-      - REDIS_HOST=redis-db 
-      - MQTT_BROKER=host.docker.internal 
-      - PYTHONUNBUFFERED=1 # Sblocca i log
+      - REDIS_HOST=redis
+      - MQTT_BROKER=mqtt
+      - PYTHONUNBUFFERED=1
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - smartcity_net
     depends_on:
       - storage
+      - mqtt
+      - redis
 
-  # 4. Orchestratore AI
   orchestrator:
     build: .
     command: python AI_Orchestrator.py
     environment:
-      - REDIS_HOST=redis-db
-      - PYTHONUNBUFFERED=1 # Sblocca i log
+      - REDIS_HOST=redis
+      - PYTHONUNBUFFERED=1
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - smartcity_net
     depends_on:
       - gateway
-  
-  dashboard: 
-    build: ./dashboard 
+
+  dashboard:
+    build: ./dashboard
     ports:
       - "8080:8080"
     environment:
       - MQTT_BROKER=mqtt
+    networks:
+      - smartcity_net
     depends_on:
       - mqtt
