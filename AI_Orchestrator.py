@@ -183,6 +183,13 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
         
         dispositivi_formattati = []
         for disp in state["dispositivi_attivi"]: 
+            if isinstance(disp, str):
+                try:
+                    disp = json.loads(disp)
+                except json.JSONDecodeError:
+                    continue
+            if not isinstance(disp, dict):
+                continue
             lat_disp = disp.get("posizione", {}).get("coordinate", {}).get("latitudine")
             lon_disp = disp.get("posizione", {}).get("coordinate", {}).get("longitudine")
             
