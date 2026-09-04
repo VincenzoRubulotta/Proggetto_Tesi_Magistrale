@@ -204,6 +204,17 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
             "dispositivi_attivi": "\n".join(dispositivi_formattati) if dispositivi_formattati else "Nessun dispositivo disponibile."
         })
         
+        if isinstance(risultato, str):
+            try:
+                testo_pulito = risultato.replace("```json", "").replace("```", "").strip()
+                risultato = json.loads(testo_pulito)
+            except json.JSONDecodeError:
+                risultato = {
+                    "stato_zona": "ANOMALIA",
+                    "livello_confidenza": "MEDIO",
+                    "motivazione_analisi": f"Errore di parsing JSON dalla risposta LLM: {risultato}"
+                }
+
         print(f"[DEBUG INVESTIGATORE] Risposta grezza LLM (Analisi JSON): {risultato}")
         print(f"Esito: {risultato.get('stato_zona')} (Confidenza: {risultato.get('livello_confidenza')})")
 
