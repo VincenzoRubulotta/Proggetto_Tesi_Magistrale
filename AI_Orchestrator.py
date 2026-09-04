@@ -286,13 +286,22 @@ def nodo_router(state: SmartCityState) -> SmartCityState:
             for disp in state["dispositivi_attivi"]:
                 if isinstance(disp, str):
                     try:
-                        disp = json.loads(disp)
+                        disp_dict = json.loads(disp)
+                        if isinstance(disp_dict, dict) and id_richiesto.upper() == disp_dict.get("id_dispositivo", "").upper():
+                            target_disp = disp_dict
+                            break
                     except json.JSONDecodeError:
-                        continue
+                        if id_richiesto.upper() in disp.upper():
+                            target_disp = {
+                                "id_dispositivo": id_richiesto,
+                                "is_mobile": "drone" in disp.lower() or "mobile: sì" in disp.lower()
+                            }
+                            break
                 
-                if isinstance(disp, dict) and id_richiesto.upper() == disp.get("id_dispositivo", "").upper():
-                    target_disp = disp
-                    break
+                elif isinstance(disp, dict):
+                    if id_richiesto.upper() == disp.get("id_dispositivo", "").upper():
+                        target_disp = disp
+                        break
 
             if target_disp:
                     id_pulito = target_disp["id_dispositivo"]
