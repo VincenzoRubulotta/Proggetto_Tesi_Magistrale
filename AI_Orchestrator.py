@@ -62,26 +62,24 @@ Valuta gli eventi seguendo queste REGOLE ASSOLUTE:
    - DISTANZA: preferisci quelli più vicini all'evento.
    - MOBILITÀ E BATTERIA: se usi un dispositivo mobile (es. drone) per ispezionare l'area, assicurati che la batteria sia sufficiente.
 
-ESEMPIO 1 - COMPORTAMENTO IN CASO DI DUBBIO (Solo audio, senza immagini):
+ESEMPIO 1 - COMPORTAMENTO IN CASO DI DUBBIO (Solo audio o temperatura, senza immagini):
 {{
     "traduzione_e_fatti": "Il microfono rileva un forte boato.",
     "pericoli_rilevati": ["Possibile esplosione"],
     "stato_zona": "ANOMALIA",
     "livello_confidenza": "MEDIO",
-    "motivazione_analisi": "Allarme acustico grave. Richiedo la telecamera CAM_SUD perché è specializzata nel rilevamento di incendi ed esplosioni.",
-    "tipo_dispositivo_richiesto": "telecamera",
-    "id_dispositivo_richiesto": "<INSERISCI_QUI_ID_REALE_DALLA_LISTA_CON_SPECIALIZZAZIONE_ADATTA>"
+    "motivazione_analisi": "Allarme acustico grave. Richiedo la telecamera più vicina per ispezione visiva.",
+    "id_dispositivi_richiesti": ["<INSERISCI_QUI_ID_REALE>"]
 }}
 
 ESEMPIO 2 - COMPORTAMENTO IN CASO DI CERTEZZA (Verifica visiva completata o emergenza palese):
 {{
-    "traduzione_e_fatti": "La telecamera mostra un cantiere con un escavatore al lavoro. Non ci sono incidenti.",
+    "traduzione_e_fatti": "La telecamera mostra un cantiere. Non ci sono incidenti.",
     "pericoli_rilevati": [],
     "stato_zona": "NORMALE",
     "livello_confidenza": "ALTO",
-    "motivazione_analisi": "L'immagine conferma che i rumori derivano da normali lavori di cantiere. Nessun pericolo.",
-    "tipo_dispositivo_richiesto": "NESSUNO",
-    "id_dispositivo_richiesto": "NESSUNO"
+    "motivazione_analisi": "L'immagine conferma che i rumori derivano da lavori. Nessun pericolo.",
+    "id_dispositivi_richiesti": []
 }}
 
 Rispondi ESCLUSIVAMENTE in formato JSON usando questa struttura:
@@ -91,7 +89,6 @@ Rispondi ESCLUSIVAMENTE in formato JSON usando questa struttura:
     "stato_zona": "NORMALE, ANOMALIA o CRITICO",
     "livello_confidenza": "ALTO, MEDIO o BASSO",
     "motivazione_analisi": "Il tuo ragionamento logico, specificando PERCHÉ hai scelto un determinato sensore in base alle sue specializzazioni.",
-    "tipo_dispositivo_richiesto": "Scrivi il tipo (es. telecamera o drone). Scrivi NESSUNO solo se confidenza è ALTO.",
     "id_dispositivi_richiesti": ["Copia", "qui", "un array di ID esatti presi dalla lista", "oppure un array vuoto [] se ALTO"]
 }}
 """
@@ -187,9 +184,22 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
                 try:
                     disp = json.loads(disp)
                 except json.JSONDecodeError:
+                    dispositivi_formattati.append(f"- {disp}")
                     continue
             if not isinstance(disp, dict):
-                continue
+                lat_disp = disp.get("posizione", {}).get("coordinate", {}).get("latitudine")
+                lon_disp = disp.get("posizione", {}).get("coordinate", {}).get("longitudine")
+                
+                distanza = calcola_distanza(lat_evento, lon_evento, lat_disp, lon_disp)
+                dist_str = f"{distanza:.0f}m" if distanza != float('inf') else "Sconosciuta"
+                
+                mob = "SÌ" if disp.get("is_mobile") else "NO"
+                batt = f"{disp.get('batteria')}%" if disp.get("batteria") else "N/D"
+                spec = ", ".join(disp.get("specializzazioni", []))
+                
+                info = f"- ID: {disp.get('id_dispositivo', 'Sconosciuto')} (Tipo: {disp.get('tipo_dispositivo', '')}, Mobile: {mob}, Distanza: {dist_str}, Batteria: {batt}, Specializzazioni: [{spec}])"
+                dispositivi_formattati.append(info)
+
             lat_disp = disp.get("posizione", {}).get("coordinate", {}).get("latitudine")
             lon_disp = disp.get("posizione", {}).get("coordinate", {}).get("longitudine")
             
