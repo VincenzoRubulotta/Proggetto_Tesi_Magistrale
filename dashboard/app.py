@@ -6,7 +6,13 @@ import paho.mqtt.client as mqtt
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'smartcity_secret'
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(
+    app, 
+    cors_allowed_origins="*", 
+    logger=True,          
+    engineio_logger=True, 
+    ping_timeout=60      
+)
 
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = 1883
@@ -46,4 +52,4 @@ if __name__ == '__main__':
     mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
     mqtt_client.loop_start()
     print("Avvio Dashboard su porta 8080...")
-    socketio.run(app, host='0.0.0.0', port=8080)
+    socketio.run(app, host='0.0.0.0', port=8080, allow_unsafe_werkzeug=True)

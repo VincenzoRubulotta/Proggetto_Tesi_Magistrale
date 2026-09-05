@@ -25,7 +25,17 @@
     <div id="map"></div>
 
     <script>
-        const socket = io();
+        const socket = io({
+            transports: ['websocket', 'polling']
+        });
+
+        socket.on('connect', () => {
+            console.log("Connesso al server Socket.IO con ID:", socket.id);
+        });
+
+        socket.on('connect_error', (error) => {
+            console.error("Errore di connessione Socket.IO:", error);
+        });
         
         socket.on('new_log', function(data) {
             let deviceId = data.id_dispositivo;
