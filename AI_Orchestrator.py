@@ -375,16 +375,23 @@ def nodo_comandante(evento):
             lon_disp = disp.get("posizione", {}).get("coordinate", {}).get("longitudine")
             
             distanza = calcola_distanza(lat_esatta, lon_esatta, lat_disp, lon_disp)
-            dist_str = f"{distanza:.0f}m" if distanza != float('inf') else "Sconosciuta"
+            distanza_int = int(distanza) if distanza != float('inf') else 9999
             
-            mob = "SÌ" if disp.get("is_mobile") else "NO"
-            batt = f"{disp.get('batteria')}%" if disp.get("batteria") else "N/D"
-            spec = ", ".join(disp.get("specializzazioni", []))
+            is_mobile = "drone" in disp.get('tipo_dispositivo', '').lower() or disp.get("is_mobile") == True
+            batteria = int(disp.get('batteria', 100)) # Assicuriamo sia un intero
+            spec = disp.get("specializzazioni", [])
             
-            info = f"- ID: {disp['id_dispositivo']} (Tipo: {disp['tipo_dispositivo']}, Mobile: {mob}, Distanza dal Target: {dist_str}, Batteria: {batt}, Specializzazioni: [{spec}])"
-            dispositivi_formattati.append(info)
+            info_dict = {
+                "ID": disp.get('id_dispositivo', 'SCONOSCIUTO'),
+                "TIPO": disp.get('tipo_dispositivo', 'sconosciuto'),
+                "IS_MOBILE": is_mobile,
+                "DISTANZA_METRI": distanza_int,
+                "BATTERIA_PERCENTUALE": batteria,
+                "SPECIALIZZAZIONI": spec
+            }
+            dispositivi_formattati.append(info_dict)
 
-    dispositivi_str = "\n".join(dispositivi_formattati) if dispositivi_formattati else "Nessun dispositivo disponibile."
+    dispositivi_str = json.dumps(dispositivi_formattati, indent=2)
 
     prompt_comandante = f"""Sei il Comandante Operativo delle Forze di Sicurezza e Soccorso della Smart City.
 Stai valutando una potenziale emergenza.
