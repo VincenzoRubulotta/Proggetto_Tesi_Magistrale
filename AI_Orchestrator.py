@@ -363,6 +363,13 @@ def nodo_comandante(evento):
     
     dispositivi_formattati = []
     for disp in dispositivi_attivi:
+        if isinstance(disp, str):
+            try:
+                disp = json.loads(disp)
+            except json.JSONDecodeError:
+                dispositivi_formattati.append(f"- {disp}")
+                continue
+                
         if isinstance(disp, dict):
             lat_disp = disp.get("posizione", {}).get("coordinate", {}).get("latitudine")
             lon_disp = disp.get("posizione", {}).get("coordinate", {}).get("longitudine")
@@ -447,6 +454,17 @@ Rispondi ESCLUSIVAMENTE in formato JSON con questa esatta struttura ordinata:
                     if isinstance(d, dict) and d.get("id_dispositivo", "").upper() == id_pulito.upper():
                         is_mobile = d.get("is_mobile", False)
                         break
+
+                    elif isinstance(d, str):
+                        try:
+                            d_dict = json.loads(d)
+                            if d_dict.get("id_dispositivo", "").upper() == id_pulito.upper():
+                                is_mobile = d_dict.get("is_mobile", False)
+                                break
+                        except json.JSONDecodeError:
+                            if id_pulito.upper() in d.upper():
+                                is_mobile = "drone" in d.lower() or "mobile: sì" in d.lower()
+                                break
 
                 topic_cmd = f"smartcity/comandi/{id_pulito}"
                 payload_cmd = {
