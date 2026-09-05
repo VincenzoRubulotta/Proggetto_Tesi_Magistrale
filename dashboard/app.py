@@ -6,7 +6,7 @@ import paho.mqtt.client as mqtt
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'smartcity_secret'
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
 MQTT_PORT = 1883
@@ -21,6 +21,8 @@ def on_message(client, userdata, msg):
         payload = json.loads(msg.payload.decode())
         topic = msg.topic
         
+        print(f"[DASHBOARD] Ricevuto messaggio su: {topic}")
+
         if topic.startswith("smartcity/logs/"):
             socketio.emit('new_log', payload)
             
@@ -28,6 +30,8 @@ def on_message(client, userdata, msg):
             socketio.emit('map_update', payload)
             
     except Exception as e:
+
+        print(f"[DASHBOARD ERRORE] Impossibile processare il messaggio: {e}")
         pass
 
 mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)

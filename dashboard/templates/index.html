@@ -25,9 +25,7 @@
     <div id="map"></div>
 
     <script>
-        const socket = io('http://localhost:8080', {
-            transports: ['websocket', 'polling']
-        });
+        const socket = io();
         
         socket.on('new_log', function(data) {
             let deviceId = data.id_dispositivo;
