@@ -9,9 +9,9 @@ app.config['SECRET_KEY'] = 'smartcity_secret'
 socketio = SocketIO(
     app, 
     cors_allowed_origins="*", 
-    logger=True,          
-    engineio_logger=True, 
-    ping_timeout=60      
+    async_mode='threading', 
+    logger=False,             
+    engineio_logger=False
 )
 
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
