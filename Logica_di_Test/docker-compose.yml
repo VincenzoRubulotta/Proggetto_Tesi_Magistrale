@@ -19,8 +19,8 @@ services:
       - DEVICE_TYPE=microfono
       - IS_MOBILE=False
       - SPECIALIZATIONS=sirene,esplosioni,rumori_anomali
-      - LATITUDE=37.5112
-      - LONGITUDE=15.0890
+      - LATITUDE=37.514077
+      - LONGITUDE=15.092305
     networks:
       - smartcity_net
 
@@ -38,8 +38,8 @@ services:
       - DEVICE_TYPE=sensore_temperatura
       - IS_MOBILE=False
       - SPECIALIZATIONS=incendi,rilevamento_calore
-      - LATITUDE=37.5110
-      - LONGITUDE=15.0880
+      - LATITUDE=37.514206
+      - LONGITUDE=15.092822
     networks:
       - smartcity_net
 
@@ -57,8 +57,8 @@ services:
       - DEVICE_TYPE=telecamera
       - IS_MOBILE=False
       - SPECIALIZATIONS=incendi,traffico
-      - LATITUDE=37.5115
-      - LONGITUDE=15.0888
+      - LATITUDE=37.51451177399222
+      - LONGITUDE=15.092750411644252
     networks:
       - smartcity_net
 
@@ -76,8 +76,8 @@ services:
       - DEVICE_TYPE=drone
       - IS_MOBILE=True
       - SPECIALIZATIONS=incidenti,incendi,ricerca_visiva
-      - LATITUDE=37.5125 
-      - LONGITUDE=15.0895
+      - LATITUDE=37.516244
+      - LONGITUDE=15.092584
     networks:
       - smartcity_net
 
