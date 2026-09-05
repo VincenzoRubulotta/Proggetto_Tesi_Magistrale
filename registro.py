@@ -1,4 +1,5 @@
 import redis
+import json
 
 class RegistroDispositivi:
     def __init__(self, host='localhost', port=6379, timeout_secondi=300):
