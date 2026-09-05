@@ -17,7 +17,8 @@ class RegistroDispositivi:
 
         chiave_redis = f"smartcity:registry:{zona}:{id_disp}"
 
-        self.r.set(chiave_redis, tipo, ex=self.timeout_secondi)
+        valore_stringa = json.dumps(payload_json)
+        self.r.set(chiave_redis, valore_stringa, ex=self.timeout_secondi)
 
     def ottieni_dispositivi_attivi(self, zona, ts_riferimento=None):
         """Cerca in Redis i dispositivi attualmente vivi per questa zona."""
@@ -27,10 +28,8 @@ class RegistroDispositivi:
         
         dispositivi_attivi = []
         for chiave in chiavi_attive:
-            tipo = self.r.get(chiave)
-            
-            id_disp = chiave.split(":")[-1]
-            
-            dispositivi_attivi.append(f"{id_disp} (Tipo: {tipo})")
+            dati_str = self.r.get(chiave)
+            if dati_str:
+                dispositivi_attivi.append(dati_str)
             
         return dispositivi_attivi
