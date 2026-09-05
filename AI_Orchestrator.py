@@ -418,8 +418,8 @@ Rispondi ESCLUSIVAMENTE in formato JSON con questa esatta struttura ordinata:
         "longitudine": {lon_esatta if lon_esatta else "null"}
     }},
     "unita_intervento_umano": ["Elenco delle forze umane da inviare. Scrivi NESSUNO se non c'è emergenza"],
-    "dispositivi_tattici_attivati": ["Elenco ID dispositivi IoT scelti dalla lista. Scrivi NESSUNO se non servono"],
-    "motivazione_tattica_iot": "Spiega PERCHÉ hai scelto quei specifici dispositivi IoT (valutando specializzazione, distanza e batteria).",
+    "motivazione_tattica_iot": "FONDAMENTALE: Pensa ad alta voce PRIMA di scegliere. Scrivi qui il tuo ragionamento valutando e confrontando ESPLICITAMENTE le specializzazioni, le distanze dal target e le batterie dei dispositivi nella lista.",
+    "dispositivi_tattici_attivati": ["Elenco ID dispositivi IoT scelti dalla lista basandoti sulla motivazione appena scritta. Scrivi NESSUNO se non servono"]
 }}
 """
     
