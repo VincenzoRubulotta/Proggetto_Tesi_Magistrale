@@ -75,7 +75,7 @@ services:
       - DEVICE_NAME=Drone_Ricognitore_Alpha
       - DEVICE_TYPE=drone
       - IS_MOBILE=True
-      - SPECIALIZATIONS=incidenti,incendi,ricerca_visiva
+      - SPECIALIZATIONS=ricerca_visiva,telecamera
       - LATITUDE=37.516244
       - LONGITUDE=15.092584
     networks:
@@ -91,11 +91,30 @@ services:
       - MQTT_BROKER=mqtt
       - STORAGE_UPLOAD_URL=http://storage:5000/upload
       - DEVICE_ID=DRONE_02
-      - DEVICE_NAME=Drone_Ricognitore_Beta
+      - DEVICE_NAME=Drone_Pompiere_Beta
       - DEVICE_TYPE=drone
       - IS_MOBILE=True
-      - SPECIALIZATIONS=incidenti,incendi,primo_soccorso
+      - SPECIALIZATIONS=spegnimento_incendi,pompa_acqua
+      - LATITUDE=37.5135 
+      - LONGITUDE=15.0910
+    networks:
+      - smartcity_net
+
+  drone_03:
+    build: .
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./Data_Pool:/app/Data_Pool
+    environment:
+      - MQTT_BROKER=mqtt
+      - STORAGE_UPLOAD_URL=http://storage:5000/upload
+      - DEVICE_ID=DRONE_03
+      - DEVICE_NAME=Drone_Pompiere_Gamma
+      - DEVICE_TYPE=drone
+      - IS_MOBILE=True
+      - SPECIALIZATIONS=spegnimento_incendi,schiuma_ritardante
       - LATITUDE=37.5180 
-      - LONGITUDE=15.0950
+      - LONGITUDE=15.0990
     networks:
       - smartcity_net
