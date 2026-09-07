@@ -5,24 +5,25 @@ import queue
 import math
 import threading
 import logging
-from typing import Any
+import base64
 from typing import TypedDict, List, Dict, Any, Optional
+from concurrent.futures import ThreadPoolExecutor
+
+import requests
+import redis
+import ollama
 import paho.mqtt.client as mqtt
 from dotenv import load_dotenv
-import base64
 from langchain_core.messages import HumanMessage
-import requests
-from langchain_ollama import ChatOllama
-import ollama
-from langgraph.graph import StateGraph, END
-from langchain_ollama import OllamaLLM
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
-import redis
-from concurrent.futures import ThreadPoolExecutor
+from langchain_ollama import ChatOllama, OllamaLLM
+from langgraph.graph import StateGraph, END
+
 from memoria import MemoriaSpazioTemporale
 from registro import RegistroDispositivi
-from langchain_core.output_parsers import JsonOutputParser
+from prompts import TEMPLATE_INVESTIGATORE, TEMPLATE_CORRETTORE, get_prompt_comandante
+from utils import analizza_immagine_vlm, formatta_dispositivi_investigatore, ordina_e_taglia_dispositivi_comandante
 
 # --- CONFIGURAZIONI INIZIALI ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -41,79 +42,14 @@ vlm = ChatOllama(model="moondream", base_url="http://host.docker.internal:11434"
 gestore_memoria = MemoriaSpazioTemporale(host=REDIS_HOST, port=REDIS_PORT, finestra_secondi=120)
 gestore_registro = RegistroDispositivi(host=REDIS_HOST, port=REDIS_PORT, timeout_secondi=300)
 
-# --- PROMPT DEL NODO 1 ---
-template_smart_city = """Sei il Cervello Analitico del Digital Twin di una Smart City.
-Stai monitorando la zona urbana: {nome_zona}.
 
-Ecco il resoconto degli eventi IoT registrati negli ultimi 120 secondi:
-{contesto_eventi}
-
-DISPOSITIVI ATTUALMENTE ONLINE (Con Distanza dall'evento, Mobilità, Batteria e Specializzazioni):
-{dispositivi_attivi}
-
-IL TUO OBIETTIVO LOGICO:
-Valuta gli eventi seguendo queste REGOLE ASSOLUTE:
-
-IL TUO OBIETTIVO LOGICO:
-Valuta gli eventi seguendo queste REGOLE ASSOLUTE:
-
-1. TRADUZIONE: Traduci le descrizioni visive (VLM) dall'inglese all'italiano.
-2. ADERENZA AI DATI: Usa SOLO i dati forniti. Non inventare immagini, pericoli o dispositivi inesistenti.
-3. EMERGENZA CONFERMATA (ALTO): Se i dati o le immagini confermano in modo inequivocabile un'emergenza in corso (qualsiasi essa sia: strutturale, sanitaria, ambientale, criminale, ecc.), imposta lo stato su CRITICO, confidenza su ALTO e chiedi dispositivo NESSUNO.
-4. INCERTEZZA E INDAGINE (MEDIO/BASSO): Se c'è un allarme da un sensore ma MANCA una conferma incrociata o visiva definitiva, lo stato è ANOMALIA e la confidenza è MEDIO. In questo caso, DEVI richiedere l'intervento di uno o più dispositivi dalla lista per un controllo supplementare. Scegli valutando:
-   - COERENZA DELLE SPECIALIZZAZIONI: seleziona dispositivi le cui capacità siano logicamente utili per indagare il tipo specifico di anomalia rilevata.
-   - DISTANZA: a parità di utilità, preferisci SEMPRE i dispositivi più vicini all'evento.
-   - MOBILITÀ E BATTERIA: se scegli un dispositivo mobile ("IS_MOBILE": true) per l'ispezione, la sua batteria deve essere > 20.
-5. PREVENZIONE LOOP: Non richiedere MAI l'intervento di un dispositivo il cui ID è già presente nel "contesto_eventi" come fonte dell'allarme.
-6. RISOLUZIONE EMERGENZA (CESSATO ALLARME AUTONOMO): Se lo STATO OPERATIVO ATTUALE è "CRITICO", analizza L'ULTIMO evento in ordine cronologico. Puoi abbassare lo stato a "NORMALE" SOLO SE l'ultimo dato visivo (VLM) ricevuto descrive esplicitamente che la situazione è tornata tranquilla. Se i vecchi eventi mostrano l'emergenza ma l'evento più recente mostra la strada pulita, significa che il pericolo è rientrato e DEVI decretare lo stato NORMALE.
-
-ESEMPIO 1 - COMPORTAMENTO IN CASO DI DUBBIO (Solo audio o temperatura, senza immagini):
-{{
-    "traduzione_e_fatti": "Il microfono rileva un forte boato.",
-    "pericoli_rilevati": ["<INSERISCI_QUI_I_PERICOLI>"],
-    "stato_zona": "ANOMALIA",
-    "livello_confidenza": "MEDIO",
-    "motivazione_analisi": "Allarme acustico grave. Richiedo la telecamera più vicina per ispezione visiva.",
-    "id_dispositivi_richiesti": ["<INSERISCI_QUI_ID_REALE>"]
-}}
-
-ESEMPIO 2 - COMPORTAMENTO IN CASO DI CERTEZZA (Verifica visiva completata o emergenza palese):
-{{
-    "traduzione_e_fatti": "La telecamera mostra un cantiere. Non ci sono incidenti.",
-    "pericoli_rilevati": [],
-    "stato_zona": "NORMALE",
-    "livello_confidenza": "ALTO",
-    "motivazione_analisi": "L'immagine conferma che i rumori derivano da lavori. Nessun pericolo.",
-    "id_dispositivi_richiesti": []
-}}
-
-Rispondi ESCLUSIVAMENTE in formato JSON usando questa struttura:
-{{
-    "traduzione_e_fatti": "La tua traduzione e i fatti.",
-    "pericoli_rilevati": ["lista pericoli o vuoto"],
-    "stato_zona": "NORMALE, ANOMALIA o CRITICO",
-    "livello_confidenza": "ALTO, MEDIO o BASSO",
-    "motivazione_analisi": "Il tuo ragionamento logico, specificando PERCHÉ hai scelto un determinato sensore in base alle sue specializzazioni.",
-    "id_dispositivi_richiesti": ["Copia", "qui", "un array di ID esatti presi dalla lista", "oppure un array vuoto [] se ALTO"]
-}}
-"""
-prompt = PromptTemplate(template=template_smart_city, input_variables=["nome_zona", "contesto_eventi", "dispositivi_attivi"])
+prompt = PromptTemplate(template=TEMPLATE_INVESTIGATORE, input_variables=["nome_zona", "contesto_eventi", "dispositivi_attivi"])
 analisi_chain = prompt | llm | JsonOutputParser()
 
 client_pub = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 client_pub.connect(MQTT_BROKER, MQTT_PORT, 60)
 client_pub.loop_start()
 
-def calcola_distanza(lat1, lon1, lat2, lon2):
-    """Calcola la distanza in metri tra due coordinate GPS usando la formula di Haversine."""
-    if None in (lat1, lon1, lat2, lon2):
-        return float('inf') 
-    R = 6371000
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lon2 - lon1)
-    a = math.sin(dphi/2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda/2)**2
-    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 # ==========================================================
 # ARCHITETTURA LANGGRAPH: LO STATO E I NODI
@@ -132,93 +68,23 @@ class SmartCityState(TypedDict):
 def nodo_investigatore(state: SmartCityState) -> SmartCityState:
     print(f"\n[NODO 1: INVESTIGATORE] Analizzo la zona: {state['zona']}")
 
-    contesto = state["contesto_eventi"]
-    for evento in contesto:
+    for evento in state["contesto_eventi"]:
         if "immagine_url" in evento and evento["immagine_url"]:
             print(f"[VLM] Rilevato URL Immagine Remota nell'evento del sensore {evento.get('id_dispositivo')}! Inizio download...")
-            url_immagine = evento["immagine_url"]
-            
-            try:
-                risposta_http = requests.get(url_immagine, timeout=5)
-                risposta_http.raise_for_status()
-                
-                image_b64 = base64.b64encode(risposta_http.content).decode("utf-8")
-                print("[VLM] Download completato. Risveglio Moondream per l'analisi visiva...")
-                
-                # Creiamo il messaggio per LangChain usando l'inglese per aiutare Moondream
-                messaggio = HumanMessage(
-                    content=[
-                        {"type": "text", "text": "You are a security analyst. Describe exactly what you see in this image. Are there any accidents, hazards, vehicles, or people?"},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}}
-                    ]
-                )
-                
-                # Invochiamo il VLM tramite LangChain (così LangSmith traccia tutto!)
-                risposta_vlm = vlm.invoke([messaggio])
-                
-                # Estraiamo il contenuto testuale
-                descrizione_visiva = risposta_vlm.content.strip()
+            descrizione_visiva = analizza_immagine_vlm(evento["immagine_url"], vlm)
+            if descrizione_visiva:
                 print(f"[VLM] Report Visivo Generato: {descrizione_visiva}")
-                
                 evento["analisi_telecamera_vlm"] = descrizione_visiva
-                
-                
-            except requests.exceptions.RequestException as e:
-                print(f"[VLM] Errore nel download dell'immagine remota: {e}")
-            except Exception as e:
-                print(f"[VLM] Errore durante l'analisi visiva: {e}")
-    try:
-        eventi_testo_pulito = ""
-        lat_evento, lon_evento = None, None
 
+    try:
+        lat_evento, lon_evento = None, None
         if state["contesto_eventi"] and "posizione" in state["contesto_eventi"][0]:
             coord = state["contesto_eventi"][0]["posizione"].get("coordinate")
             if coord:
                 lat_evento = coord.get("latitudine")
                 lon_evento = coord.get("longitudine")
         
-        for ev in state["contesto_eventi"]:
-            eventi_testo_pulito += f"- Dispositivo: {ev.get('nome_dispositivo', 'Sconosciuto')} ({ev.get('tipo_dispositivo', 'Sconosciuto')})\n"
-            if "analisi_telecamera_vlm" in ev:
-                eventi_testo_pulito += f"  Analisi Visiva (VLM): {ev['analisi_telecamera_vlm']}\n"
-            if "dato_rilevato" in ev:
-                eventi_testo_pulito += f"  Dato Sensore: {ev['dato_rilevato']}\n"
-            eventi_testo_pulito += "\n"
-        
-        dispositivi_formattati = []
-        for disp in state["dispositivi_attivi"]: 
-            if isinstance(disp, str):
-                try:
-                    disp = json.loads(disp)
-                except json.JSONDecodeError:
-                    dispositivi_formattati.append(f"- {disp}")
-                    continue
-            if not isinstance(disp, dict):
-                lat_disp = disp.get("posizione", {}).get("coordinate", {}).get("latitudine")
-                lon_disp = disp.get("posizione", {}).get("coordinate", {}).get("longitudine")
-                
-                distanza = calcola_distanza(lat_evento, lon_evento, lat_disp, lon_disp)
-                dist_str = f"{distanza:.0f}m" if distanza != float('inf') else "Sconosciuta"
-                
-                mob = "SÌ" if disp.get("is_mobile") else "NO"
-                batt = f"{disp.get('batteria')}%" if disp.get("batteria") else "N/D"
-                spec = ", ".join(disp.get("specializzazioni", []))
-                
-                info = f"- ID: {disp.get('id_dispositivo', 'Sconosciuto')} (Tipo: {disp.get('tipo_dispositivo', '')}, Mobile: {mob}, Distanza: {dist_str}, Batteria: {batt}, Specializzazioni: [{spec}])"
-                dispositivi_formattati.append(info)
-
-            lat_disp = disp.get("posizione", {}).get("coordinate", {}).get("latitudine")
-            lon_disp = disp.get("posizione", {}).get("coordinate", {}).get("longitudine")
-            
-            distanza = calcola_distanza(lat_evento, lon_evento, lat_disp, lon_disp)
-            dist_str = f"{distanza:.0f}m" if distanza != float('inf') else "Sconosciuta"
-            
-            mob = "SÌ" if disp.get("is_mobile") else "NO"
-            batt = f"{disp.get('batteria')}%" if disp.get("batteria") else "N/D"
-            spec = ", ".join(disp.get("specializzazioni", []))
-            
-            info = f"- ID: {disp['id_dispositivo']} (Tipo: {disp['tipo_dispositivo']}, Mobile: {mob}, Distanza dall'evento: {dist_str}, Batteria: {batt}, Specializzazioni: [{spec}])"
-            dispositivi_formattati.append(info)
+        dispositivi_formattati = formatta_dispositivi_investigatore(state["dispositivi_attivi"], lat_evento, lon_evento)
 
         print(f"\n[DEBUG INVESTIGATORE] Dispositivi attivi passati all'LLM: {state['dispositivi_attivi']}")
 
@@ -239,6 +105,7 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
                 
             risultato = json.loads(testo_pulito)
 
+            # Controllo Cessato Allarme Autonomo
             if risultato.get("stato_zona") == "NORMALE" and stato_globale == "CRITICO":
                 gestore_registro.r.set(f"smartcity:stato_emergenza:{state['zona']}", "NORMALE")
                 print(f"\n[STATE MACHINE] L'IA ha decretato il CESSATO ALLARME! La zona {state['zona']} è di nuovo sicura.")
@@ -247,6 +114,7 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
             state["errore_parsing"] = None
             print(f"[DEBUG INVESTIGATORE] Analisi JSON completata con successo.")
             print(f"Esito: {risultato.get('stato_zona')} (Confidenza: {risultato.get('livello_confidenza')})")
+            
         except json.JSONDecodeError as e:
             print(f"[ALLARME] L'LLM ha generato un JSON corrotto! Attivo il Nodo Correttore...")
             state["raw_text"] = risposta_grezza
@@ -258,18 +126,12 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
         
     return state
 
+
 def nodo_correttore(state: SmartCityState) -> SmartCityState:
     print(f"\n[NODO CORRETTORE] Tento di riparare la formattazione per la zona: {state['zona']}")
     
-    template_correzione = """Hai generato un JSON non valido. 
-Errore riscontrato dal parser: {errore}
-
-Testo originale difettoso:
-{testo_raw}
-
-Correggi l'errore di sintassi e restituisci ESCLUSIVAMENTE il JSON valido, senza testo o markdown.
-"""
-    prompt_corr = PromptTemplate(template=template_correzione, input_variables=["errore", "testo_raw"])
+    
+    prompt_corr = PromptTemplate(template=TEMPLATE_CORRETTORE, input_variables=["errore", "testo_raw"])
     risposta_grezza = (prompt_corr | llm).invoke({
         "errore": state.get("errore_parsing", "Errore JSON generico"),
         "testo_raw": state.get("raw_text", "")
@@ -397,99 +259,36 @@ def nodo_comandante(evento):
     dispositivi_attivi = evento.get("dispositivi_attivi", [])
     
     lat_esatta, lon_esatta = None, None
-
     for ev in contesto_eventi:
         if "analisi_telecamera_vlm" in ev and ev.get("posizione") and ev["posizione"].get("coordinate"):
             lat_esatta = ev["posizione"]["coordinate"].get("latitudine")
             lon_esatta = ev["posizione"]["coordinate"].get("longitudine")
             break
-    
-
+            
     if lat_esatta is None or lon_esatta is None:
         if contesto_eventi and "posizione" in contesto_eventi[0] and contesto_eventi[0]["posizione"].get("coordinate"):
             lat_esatta = contesto_eventi[0]["posizione"]["coordinate"].get("latitudine")
             lon_esatta = contesto_eventi[0]["posizione"]["coordinate"].get("longitudine")
             
     coordinate_str = f"Latitudine: {lat_esatta}, Longitudine: {lon_esatta}" if lat_esatta else "Non specificate"
-
     dispositivi_trigger = list(set([ev.get("id_dispositivo") for ev in contesto_eventi if "id_dispositivo" in ev]))
 
     print(f"\n[NODO 3: COMANDANTE] Valutazione Intervento Strategico per {zona}...")
     
-    dispositivi_formattati = []
-    for disp in dispositivi_attivi:
-        if isinstance(disp, str):
-            try:
-                disp = json.loads(disp)
-            except json.JSONDecodeError:
-                dispositivi_formattati.append(f"- {disp}")
-                continue
-                
-        if isinstance(disp, dict):
-            lat_disp = disp.get("posizione", {}).get("coordinate", {}).get("latitudine")
-            lon_disp = disp.get("posizione", {}).get("coordinate", {}).get("longitudine")
-            
-            distanza = calcola_distanza(lat_esatta, lon_esatta, lat_disp, lon_disp)
-            distanza_int = int(distanza) if distanza != float('inf') else 9999
-            
-            is_mobile = "drone" in disp.get('tipo_dispositivo', '').lower() or disp.get("is_mobile") == True
-            batteria = int(disp.get('batteria', 100)) # Assicuriamo sia un intero
-            spec = disp.get("specializzazioni", [])
-            
-            info_dict = {
-                "ID": disp.get('id_dispositivo', 'SCONOSCIUTO'),
-                "TIPO": disp.get('tipo_dispositivo', 'sconosciuto'),
-                "IS_MOBILE": is_mobile,
-                "DISTANZA_METRI": distanza_int,
-                "BATTERIA_PERCENTUALE": batteria,
-                "SPECIALIZZAZIONI": spec
-            }
-            dispositivi_formattati.append(info_dict)
+    dispositivi_str = ordina_e_taglia_dispositivi_comandante(dispositivi_attivi, lat_esatta, lon_esatta)
 
-    dispositivi_formattati = sorted(dispositivi_formattati, key=lambda x: x['DISTANZA_METRI'])
-
-    dispositivi_top_4 = dispositivi_formattati[:4]
-    dispositivi_str = json.dumps(dispositivi_top_4, indent=2)
-
-    prompt_comandante = f"""Sei il Comandante Operativo delle Forze di Sicurezza e Soccorso della Smart City.
-Stai valutando una potenziale emergenza.
-
-DATI DELL'EVENTO:
-- Zona: {zona}
-- Coordinate GPS: {coordinate_str}
-- Dispositivi che hanno lanciato l'alert: {dispositivi_trigger}
-
-REPORT DELL'INVESTIGATORE AI:
-- Motivazione e Contesto Visivo: {analisi.get('motivazione_analisi', 'Nessuna descrizione')}
-- Pericoli Rilevati: {analisi.get('pericoli_rilevati', [])}
-
-ARRAY DEI DISPOSITIVI TATTICI ONLINE (Formato JSON):
-{dispositivi_str}
-
-IL TUO OBIETTIVO STRATEGICO E TATTICO:
-1. VALUTAZIONE: Redigi una breve descrizione della situazione.
-2. FORZE UMANE: Scegli chi dispiegare tra ["POLIZIA", "AMBULANZA", "VIGILI_DEL_FUOCO", "PROTEZIONE_CIVILE"] o "NESSUNO".
-3. SUPPORTO CYBER-FISICO (IoT): I dispositivi con "IS_MOBILE": false sono INAMOVIBILI. Non puoi calcolare la loro distanza né 'inviarli'. Il tuo compito è valutare SOLO se inviare dispositivi mobili (droni) in supporto, rispettando queste regole:
-   - REGOLA 1 (Coerenza Operativa): Scegli i dispositivi le cui "SPECIALIZZAZIONI" mitigano o analizzano direttamente i "Pericoli Rilevati" (intervento fisico, medico, analitico).
-   - REGOLA 2 (Ottimizzazione Ridondanze): Evita gli sprechi. Se un sensore fisso presente in zona copre già una specifica necessità (es. ispezione visiva o acustica), non dispiegare unità mobili che offrono solo quella stessa capacità.
-   - REGOLA 3 (Logistica delle Distanze): Tra i dispositivi con specializzazioni adatte, seleziona SEMPRE quello con il valore "DISTANZA_METRI" PIÙ BASSO (fai il calcolo matematico per confrontarli).
-   - REGOLA 4 (Sicurezza Energetica): Dispiega dispositivi con "IS_MOBILE": true SOLO SE il loro valore "BATTERIA_PERCENTUALE" è strettamente > 20.
-
-Rispondi ESCLUSIVAMENTE in formato JSON con questa esatta struttura ordinata:
-{{
-    "descrizione_situazione": "Descrizione dell'emergenza.",
-    "dispositivi_coinvolti": ["Elenco ID dei dispositivi che hanno rilevato l'anomalia"],
-    "posizione_esatta": {{
-        "nome_zona": "{zona}",
-        "latitudine": {lat_esatta if lat_esatta else "null"},
-        "longitudine": {lon_esatta if lon_esatta else "null"}
-    }},
-    "unita_intervento_umano": ["Elenco forze umane"],
-    "motivazione_tattica_iot": "Spiega la scelta finale basata ESCLUSIVAMENTE sulle specializzazioni, confermando di aver scelto il primo dispositivo utile della lista.",
-    "dispositivi_tattici_attivati": ["Elenco ID dispositivi IoT scelti. Scrivi NESSUNO se non servono"]
-}}
-"""
+    prompt_comandante = get_prompt_comandante(
+        zona=zona,
+        coordinate_str=coordinate_str,
+        dispositivi_trigger=dispositivi_trigger,
+        motivazione_analisi=analisi.get('motivazione_analisi', 'Nessuna descrizione'),
+        pericoli_rilevati=analisi.get('pericoli_rilevati', []),
+        dispositivi_str=dispositivi_str,
+        lat_esatta=lat_esatta,
+        lon_esatta=lon_esatta
+    )
     
+    # Invocazione LLM e Pubblicazione Ordini MQTT
     try:
         risposta_llm = llm.invoke(prompt_comandante)
         decisione = json_parser.invoke(risposta_llm)
@@ -594,45 +393,53 @@ def check_errori_investigatore(state: SmartCityState) -> str:
     return decide_prossimo_nodo(state)
 
 # 4. ASSEMBLAGGIO DEL GRAFO
-workflow = StateGraph(SmartCityState)
-workflow.add_node("investigatore", nodo_investigatore)
-workflow.add_node("correttore", nodo_correttore)
-workflow.add_node("router", nodo_router)
-workflow.add_node("comandante", nodo_comandante)
+def crea_grafo_smart_city():
+    """Costruisce e compila il workflow di LangGraph per l'Orchestratore."""
+    workflow = StateGraph(SmartCityState)
+    
+    workflow.add_node("investigatore", nodo_investigatore)
+    workflow.add_node("correttore", nodo_correttore)
+    workflow.add_node("router", nodo_router)
+    workflow.add_node("comandante", nodo_comandante)
 
-workflow.set_entry_point("investigatore")
-workflow.add_conditional_edges(
-    "investigatore",
-    check_errori_investigatore,
-    {
-        "correttore": "correttore",
-        "router": "router",
-        "comandante": "comandante",
-        "fine": END
-    }
-)
+    workflow.set_entry_point("investigatore")
+    
+    workflow.add_conditional_edges(
+        "investigatore",
+        check_errori_investigatore,
+        {
+            "correttore": "correttore",
+            "router": "router",
+            "comandante": "comandante",
+            "fine": END
+        }
+    )
 
-workflow.add_conditional_edges(
-    "correttore",
-    decide_prossimo_nodo,
-    {
-        "router": "router",
-        "comandante": "comandante",
-        "fine": END
-    }
-)
+    workflow.add_conditional_edges(
+        "correttore",
+        decide_prossimo_nodo,
+        {
+            "router": "router",
+            "comandante": "comandante",
+            "fine": END
+        }
+    )
 
-workflow.add_edge("comandante", END)
-workflow.add_conditional_edges(
-    "router",
-    decide_dopo_router,
-    {
-        "comandante": "comandante",
-        "fine": END
-    }
-)
+    workflow.add_edge("comandante", END)
+    
+    workflow.add_conditional_edges(
+        "router",
+        decide_dopo_router,
+        {
+            "comandante": "comandante",
+            "fine": END
+        }
+    )
 
-app_smart_city = workflow.compile()
+    return workflow.compile()
+
+
+app_smart_city = crea_grafo_smart_city()
 
 
 r = redis.Redis(
