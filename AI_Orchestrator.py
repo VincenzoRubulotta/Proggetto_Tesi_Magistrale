@@ -403,30 +403,33 @@ DATI DELL'EVENTO:
 
 REPORT DELL'INVESTIGATORE AI:
 - Motivazione e Contesto Visivo: {analisi.get('motivazione_analisi', 'Nessuna descrizione')}
+- Pericoli Rilevati: {analisi.get('pericoli_rilevati', [])}
 
-DISPOSITIVI TATTICI ONLINE (DISPONIBILI IN ZONA/LIMITROFI):
+ARRAY DEI DISPOSITIVI TATTICI ONLINE (Formato JSON):
 {dispositivi_str}
 
 IL TUO OBIETTIVO STRATEGICO E TATTICO:
-1. VALUTAZIONE: Redigi una breve descrizione della situazione e dei sensori coinvolti nell'analisi.
-2. FORZE UMANE: Se l'intervento è necessario, scegli chi dispiegare tra ["POLIZIA", "AMBULANZA", "VIGILI_DEL_FUOCO", "PROTEZIONE_CIVILE"]. Se innocuo o falso allarme, scrivi "NESSUNO".
-3. SUPPORTO CYBER-FISICO (IoT): Seleziona i migliori dispositivi dalla lista per il supporto tattico o il monitoraggio dell'area. Valuta attentamente:
-   - SPECIALIZZAZIONE: adatta all'evento (es. droni antincendio, telecamere per incidenti).
-   - DISTANZA: preferisci dispositivi vicini al target.
-   - MOBILITÀ E BATTERIA: invia dispositivi mobili (es. droni) sulle coordinate dell'emergenza SOLO se hanno batteria sufficiente (>20%). Se non serve supporto, scrivi "NESSUNO".
+1. VALUTAZIONE: Redigi una breve descrizione della situazione.
+2. FORZE UMANE: Scegli chi dispiegare tra ["POLIZIA", "AMBULANZA", "VIGILI_DEL_FUOCO", "PROTEZIONE_CIVILE"] o "NESSUNO".
+3. SUPPORTO CYBER-FISICO (IoT): Seleziona i migliori dispositivi dall'array JSON. DEVI rispettare questi principi logici generali:
+   - REGOLA 1 (Coerenza Operativa): Scegli i dispositivi le cui "SPECIALIZZAZIONI" mitigano o analizzano direttamente i "Pericoli Rilevati" (intervento fisico, medico, analitico).
+   - REGOLA 2 (Ottimizzazione Ridondanze): Evita gli sprechi. Se un sensore fisso presente in zona copre già una specifica necessità (es. ispezione visiva o acustica), non dispiegare unità mobili che offrono solo quella stessa capacità.
+   - REGOLA 3 (Logistica delle Distanze): Tra i dispositivi con specializzazioni adatte, seleziona SEMPRE quello con il valore "DISTANZA_METRI" PIÙ BASSO (fai il calcolo matematico per confrontarli).
+   - REGOLA 4 (Sicurezza Energetica): Dispiega dispositivi con "IS_MOBILE": true SOLO SE il loro valore "BATTERIA_PERCENTUALE" è strettamente > 20.
 
 Rispondi ESCLUSIVAMENTE in formato JSON con questa esatta struttura ordinata:
 {{
-    "descrizione_situazione": "Descrizione riassuntiva ma completa di ciò che sta accadendo basata sull'investigazione (max 3 frasi).",
-    "dispositivi_coinvolti": ["Elenco ID dei dispositivi che hanno rilevato l'anomalia o fornito immagini"],
+    "descrizione_situazione": "Descrizione dell'emergenza.",
+    "dispositivi_coinvolti": ["Elenco ID dei dispositivi che hanno rilevato l'anomalia"],
     "posizione_esatta": {{
         "nome_zona": "{zona}",
         "latitudine": {lat_esatta if lat_esatta else "null"},
         "longitudine": {lon_esatta if lon_esatta else "null"}
     }},
-    "unita_intervento_umano": ["Elenco delle forze umane da inviare. Scrivi NESSUNO se non c'è emergenza"],
-    "motivazione_tattica_iot": "FONDAMENTALE: Pensa ad alta voce PRIMA di scegliere. Scrivi qui il tuo ragionamento valutando e confrontando ESPLICITAMENTE le specializzazioni, le distanze dal target e le batterie dei dispositivi nella lista.",
-    "dispositivi_tattici_attivati": ["Elenco ID dispositivi IoT scelti dalla lista basandoti sulla motivazione appena scritta. Scrivi NESSUNO se non servono"]
+    "unita_intervento_umano": ["Elenco forze umane"],
+    "calcolo_matematico_distanze": "Scrivi letteralmente il confronto delle distanze tra i dispositivi utili. Esempio: 'Distanza DRONE_X è 150. Distanza DRONE_Y è 600. 150 è minore di 600'.",
+    "motivazione_tattica_iot": "Spiega la scelta finale basata sull'incendio, sulle specializzazioni e sul calcolo matematico appena fatto.",
+    "dispositivi_tattici_attivati": ["Elenco ID dispositivi IoT scelti. Scrivi NESSUNO se non servono"]
 }}
 """
     
