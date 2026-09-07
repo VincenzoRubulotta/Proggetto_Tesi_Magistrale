@@ -65,7 +65,7 @@ Valuta gli eventi seguendo queste REGOLE ASSOLUTE:
    - DISTANZA: a parità di utilità, preferisci SEMPRE i dispositivi più vicini all'evento.
    - MOBILITÀ E BATTERIA: se scegli un dispositivo mobile ("IS_MOBILE": true) per l'ispezione, la sua batteria deve essere > 20.
 5. PREVENZIONE LOOP: Non richiedere MAI l'intervento di un dispositivo il cui ID è già presente nel "contesto_eventi" come fonte dell'allarme.
-6. RISOLUZIONE EMERGENZA (CESSATO ALLARME AUTONOMO): Se lo STATO OPERATIVO ATTUALE è "CRITICO", significa che un'emergenza era in corso. Puoi abbassare lo stato a "NORMALE" SOLO SE i nuovi dati visivi (VLM) descrivono esplicitamente che la situazione è tornata tranquilla e il pericolo è stato rimosso (es. strada pulita, nessun incidente visibile). Se hai solo dati audio/termici normali ma nessuna prova visiva della risoluzione, mantieni lo stato "CRITICO".
+6. RISOLUZIONE EMERGENZA (CESSATO ALLARME AUTONOMO): Se lo STATO OPERATIVO ATTUALE è "CRITICO", analizza L'ULTIMO evento in ordine cronologico. Puoi abbassare lo stato a "NORMALE" SOLO SE l'ultimo dato visivo (VLM) ricevuto descrive esplicitamente che la situazione è tornata tranquilla. Se i vecchi eventi mostrano l'emergenza ma l'evento più recente mostra la strada pulita, significa che il pericolo è rientrato e DEVI decretare lo stato NORMALE.
 
 ESEMPIO 1 - COMPORTAMENTO IN CASO DI DUBBIO (Solo audio o temperatura, senza immagini):
 {{
