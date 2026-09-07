@@ -71,9 +71,10 @@ class DispositivoNodo:
         log_to_dashboard(client, f"[{DEVICE_ID}] Arrivato a destinazione!")
         self.in_movimento = False
 
-    def invia_dato_multimediale(self, client, motivo="Allarme manuale"):
+    def invia_simulazione(self, client, scenario="CRITICO"):
+        """Invia dati deterministici basati sullo scenario scelto (CRITICO o NORMALE)"""
         if TIPO in ["telecamera", "drone"]:
-            cartella = os.path.join(BASE_POOL, "Telecamere", "Emergenze")
+            cartella = os.path.join(BASE_POOL, "Telecamere", scenario)
             file_scelto = random.choice(os.listdir(cartella)) if os.path.exists(cartella) and os.listdir(cartella) else None
             
             if file_scelto:
@@ -88,32 +89,22 @@ class DispositivoNodo:
                         "tipo_dispositivo": TIPO,
                         "posizione": {"nome_zona": ZONA, "coordinate": {"latitudine": self.lat, "longitudine": self.lon}},
                         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                        "dato_rilevato": {"allarme": "emergenza_visiva", "dettaglio": motivo},
+                        "dato_rilevato": {"allarme": "emergenza_visiva" if scenario == "CRITICO" else "nessun_allarme", "dettaglio": f"Scenario: {scenario}"},
                         "immagine_url": url_img
                     }
                     client.publish(f"smartcity/sensori/{ZONA}/{TIPO}", json.dumps(payload))
-                    log_to_dashboard(client, f"[{DEVICE_ID}] Immagine inviata! URL: {url_img}")
+                    log_to_dashboard(client, f"[{DEVICE_ID}] Immagine ({scenario}) inviata! URL: {url_img}")
                 except Exception as e:
                     log_to_dashboard(client, f"[{DEVICE_ID}] Errore invio immagine: {e}")
             else:
-                log_to_dashboard(client, f"[{DEVICE_ID}] Nessuna immagine trovata in {cartella}")
+                log_to_dashboard(client, f"[{DEVICE_ID}] Nessuna immagine in {cartella}. Crea la cartella e aggiungile!")
         
         elif TIPO == "microfono":
-            cartella = os.path.join(BASE_POOL, "Microfoni", "Emergenze")
-            dati_testuali = {
-                "allarme": "possibile_esplosione", 
-                "decibel": 120, 
-                "trascrizione_audio": "Boato isolato, rumori metallici ritmici in sottofondo."
-            }
-            
-            if os.path.exists(cartella) and os.listdir(cartella):
-                file_scelto = random.choice(os.listdir(cartella))
-                try:
-                    with open(os.path.join(cartella, file_scelto), 'r', encoding='utf-8') as f:
-                        dati_testuali = json.load(f)
-                except Exception as e:
-                    log_to_dashboard(client, f"[{DEVICE_ID}] Errore lettura file microfono: {e}. Uso fallback.")
-
+            if scenario == "CRITICO":
+                dati_testuali = {"allarme": "boato_rilevato", "decibel": 120, "trascrizione_audio": "Forte boato e rumori metallici."}
+            else:
+                dati_testuali = {"allarme": "nessuno", "decibel": 45, "trascrizione_audio": "Rumore di traffico cittadino normale."}
+                
             payload = {
                 "id_dispositivo": DEVICE_ID,
                 "nome_dispositivo": NOME,
@@ -123,20 +114,22 @@ class DispositivoNodo:
                 "dato_rilevato": dati_testuali
             }
             client.publish(f"smartcity/sensori/{ZONA}/{TIPO}", json.dumps(payload))
-            log_to_dashboard(client, f"[{DEVICE_ID}] Inviato rilevamento acustico!")
+            log_to_dashboard(client, f"[{DEVICE_ID}] Rilevamento acustico ({scenario}) inviato!")
 
         elif TIPO == "sensore_temperatura":
+            temp = 85.5 if scenario == "CRITICO" else 22.0
+            allarme = "TEMPERATURA_CRITICA" if scenario == "CRITICO" else "NESSUNO"
             payload = {
                 "id_dispositivo": DEVICE_ID,
                 "nome_dispositivo": NOME,
                 "tipo_dispositivo": TIPO,
                 "posizione": {"nome_zona": ZONA, "coordinate": {"latitudine": self.lat, "longitudine": self.lon}},
                 "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "dato_rilevato": {"temperatura_rilevata": 78.5, "soglia_allarme": 65.0, "allarme": "TEMPERATURA_CRITICA"},
+                "dato_rilevato": {"temperatura_rilevata": temp, "soglia_allarme": 65.0, "allarme": allarme},
                 "unita_misura": "Celsius"
             }
             client.publish(f"smartcity/sensori/{ZONA}/{TIPO}", json.dumps(payload))
-            log_to_dashboard(client, f"[{DEVICE_ID}] Inviato allarme temperatura critica (78.5°C)!")
+            log_to_dashboard(client, f"[{DEVICE_ID}] Temperatura: {temp}°C ({scenario}) inviata!")
 
     def elabora_comando(self, client, payload):
         comando = payload.get("comando")
@@ -147,12 +140,12 @@ class DispositivoNodo:
             self.esegui_spostamento(client, target_gps["latitudine"], target_gps["longitudine"])
             
         if comando == "RICHIEDI_DATO_EMERGENZA":
-            log_to_dashboard(client, f"[{DEVICE_ID}] Orchestratore richiede verifica. Invio in corso...")
-            self.invia_dato_multimediale(client, motivo="Richiesta da Orchestratore")
+            log_to_dashboard(client, f"[{DEVICE_ID}] Orchestratore richiede verifica. Invio conferma emergenza...")
+            # Forziamo il CRITICO per mantenere il "Flusso Demo" fluido
+            self.invia_simulazione(client, scenario="CRITICO")
 
         elif comando == "DISPIEGAMENTO_TATTICO":
             log_to_dashboard(client, f"[{DEVICE_ID}] Ordine Tattico dal Comandante: {payload.get('ordine_operativo')}")
-
 
 nodo = DispositivoNodo()
 
@@ -173,13 +166,24 @@ client.subscribe(f"smartcity/comandi/{DEVICE_ID}")
 client.loop_start()
 nodo.avvia_heartbeat(client)
 
-log_to_dashboard(client, f"[{DEVICE_ID}] ONLINE! Modalità interattiva (Premi INVIO per test).")
+log_to_dashboard(client, f"[{DEVICE_ID}] ONLINE! Modalità Test controllato.")
 
 try:
     while True:
-        input() 
-        log_to_dashboard(client, f"[{DEVICE_ID}] Allarme manuale innescato!")
-        nodo.invia_dato_multimediale(client, motivo="Allarme generato manualmente")
+        print(f"\n=== CONTROLLO MANUALE ({DEVICE_ID}) ===")
+        print("1 - INNESCA EMERGENZA (Invia foto/dati critici)")
+        print("2 - CESSATO ALLARME (Invia foto/dati normali)")
+        scelta = input("Seleziona lo scenario (1 o 2): ").strip()
+        
+        if scelta == '1':
+            log_to_dashboard(client, f"[{DEVICE_ID}] Lancio scenario CRITICO...")
+            nodo.invia_simulazione(client, scenario="CRITICO")
+        elif scelta == '2':
+            log_to_dashboard(client, f"[{DEVICE_ID}] Lancio scenario NORMALE...")
+            nodo.invia_simulazione(client, scenario="NORMALE")
+        else:
+            print("Scelta non valida. Premi 1 o 2.")
+            
 except KeyboardInterrupt:
     log_to_dashboard(client, f"[{DEVICE_ID}] Spegnimento...")
     client.loop_stop()
