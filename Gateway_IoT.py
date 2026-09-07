@@ -56,12 +56,12 @@ def on_message(client_instance, userdata, msg):
                 "analisi_json": None
             }
 
-            if r.set(f"lock_analisi:{zona}", "1", nx=True, ex=15):
+            if r.set(f"lock_analisi:{zona}", "1", nx=True, ex=30):
+                print(f"[GATEWAY] Inserisco evento per {zona} nella coda principale.")
                 r.rpush("smartcity:coda_lavori", json.dumps(stato_iniziale))
-                r.ltrim("smartcity:coda_lavori", -10, -1)
-                print(f"[ALLARME] Messaggio salvato. Lock attivato per {zona}!")
             else:
-                print(f"[GATEWAY] Ignoro evento per {zona}: indagine AI già in corso.")
+                print(f"[GATEWAY] AI occupata su {zona}. Salvo il nuovo evento nel Buffer di priorità.")
+                r.rpush(f"smartcity:buffer_eventi:{zona}", json.dumps(stato_iniziale))
         
     except json.JSONDecodeError as e:
         logging.error(f"Payload malformato: {e}")

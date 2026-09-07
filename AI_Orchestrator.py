@@ -65,6 +65,7 @@ Valuta gli eventi seguendo queste REGOLE ASSOLUTE:
    - DISTANZA: a parità di utilità, preferisci SEMPRE i dispositivi più vicini all'evento.
    - MOBILITÀ E BATTERIA: se scegli un dispositivo mobile ("IS_MOBILE": true) per l'ispezione, la sua batteria deve essere > 20.
 5. PREVENZIONE LOOP: Non richiedere MAI l'intervento di un dispositivo il cui ID è già presente nel "contesto_eventi" come fonte dell'allarme.
+6. RISOLUZIONE EMERGENZA (CESSATO ALLARME AUTONOMO): Se lo STATO OPERATIVO ATTUALE è "CRITICO", significa che un'emergenza era in corso. Puoi abbassare lo stato a "NORMALE" SOLO SE i nuovi dati visivi (VLM) descrivono esplicitamente che la situazione è tornata tranquilla e il pericolo è stato rimosso (es. strada pulita, nessun incidente visibile). Se hai solo dati audio/termici normali ma nessuna prova visiva della risoluzione, mantieni lo stato "CRITICO".
 
 ESEMPIO 1 - COMPORTAMENTO IN CASO DI DUBBIO (Solo audio o temperatura, senza immagini):
 {{
@@ -221,8 +222,12 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
 
         print(f"\n[DEBUG INVESTIGATORE] Dispositivi attivi passati all'LLM: {state['dispositivi_attivi']}")
 
+        stato_globale = gestore_registro.r.get(f"smartcity:stato_emergenza:{state['zona']}") or "NORMALE"
+        print(f"[DEBUG INVESTIGATORE] Lo stato globale attuale della zona è: {stato_globale}")
+
         risposta_grezza = (prompt | llm).invoke({
             "nome_zona": state["zona"],
+            "stato_globale": stato_globale,
             "contesto_eventi": json.dumps(state["contesto_eventi"], ensure_ascii=False),
             "dispositivi_attivi": "\n".join(dispositivi_formattati) if dispositivi_formattati else "Nessun dispositivo."
         })
@@ -233,10 +238,15 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
                 testo_pulito = testo_pulito[testo_pulito.find("{"):testo_pulito.rfind("}")+1]
                 
             risultato = json.loads(testo_pulito)
+
+            if risultato.get("stato_zona") == "NORMALE" and stato_globale == "CRITICO":
+                gestore_registro.r.set(f"smartcity:stato_emergenza:{state['zona']}", "NORMALE")
+                print(f"\n[STATE MACHINE] L'IA ha decretato il CESSATO ALLARME! La zona {state['zona']} è di nuovo sicura.")
+
             state["analisi_json"] = risultato
             state["errore_parsing"] = None
             print(f"[DEBUG INVESTIGATORE] Analisi JSON completata con successo.")
-            
+            print(f"Esito: {risultato.get('stato_zona')} (Confidenza: {risultato.get('livello_confidenza')})")
         except json.JSONDecodeError as e:
             print(f"[ALLARME] L'LLM ha generato un JSON corrotto! Attivo il Nodo Correttore...")
             state["raw_text"] = risposta_grezza
@@ -438,7 +448,8 @@ def nodo_comandante(evento):
 
     dispositivi_formattati = sorted(dispositivi_formattati, key=lambda x: x['DISTANZA_METRI'])
 
-    dispositivi_str = json.dumps(dispositivi_formattati, indent=2)
+    dispositivi_top_4 = dispositivi_formattati[:4]
+    dispositivi_str = json.dumps(dispositivi_top_4, indent=2)
 
     prompt_comandante = f"""Sei il Comandante Operativo delle Forze di Sicurezza e Soccorso della Smart City.
 Stai valutando una potenziale emergenza.
@@ -474,8 +485,7 @@ Rispondi ESCLUSIVAMENTE in formato JSON con questa esatta struttura ordinata:
         "longitudine": {lon_esatta if lon_esatta else "null"}
     }},
     "unita_intervento_umano": ["Elenco forze umane"],
-    "calcolo_matematico_distanze": "Elenca le distanze dei dispositivi mobili adatti, ordinale in modo crescente (dal più piccolo al più grande) e dichiara esplicitamente quale numero è il minore.",
-    "motivazione_tattica_iot": "Spiega la scelta finale basata sull'emergenza, sulle specializzazioni e sul calcolo matematico appena fatto.",
+    "motivazione_tattica_iot": "Spiega la scelta finale basata ESCLUSIVAMENTE sulle specializzazioni, confermando di aver scelto il primo dispositivo utile della lista.",
     "dispositivi_tattici_attivati": ["Elenco ID dispositivi IoT scelti. Scrivi NESSUNO se non servono"]
 }}
 """
@@ -541,6 +551,11 @@ Rispondi ESCLUSIVAMENTE in formato JSON con questa esatta struttura ordinata:
                 client_pub.publish(topic_cmd, json.dumps(payload_cmd))
                 print(f"[MQTT] Ordine operativo inviato al dispositivo: {id_pulito}")
         
+        stato_attuale_zona = r.get(f"smartcity:stato_emergenza:{zona}")
+        if stato_attuale_zona != "CRITICO":
+            r.set(f"smartcity:stato_emergenza:{zona}", "CRITICO")
+            print(f"[STATE MACHINE] Stato della zona {zona} bloccato su CRITICO. L'IA monitorerà il rientro dell'emergenza.")
+
     except Exception as e:
         print(f"[COMANDANTE] Errore critico di dispiegamento: {e}")
         evento["ordine_comandante"] = {"errore": "Impossibile generare l'ordine"}
@@ -633,11 +648,34 @@ executor = ThreadPoolExecutor(max_workers=NUMERO_WORKER_PARALLELI)
 
 def esegui_grafo(stato_iniziale):
     """Funzione eseguita dal singolo worker nel suo thread separato"""
-    print(f"\n[AI CORE] Inizio elaborazione evento per {stato_iniziale['zona']}...")
+    zona = stato_iniziale.get('zona', 'Sconosciuta')
+    print(f"\n[AI CORE] Inizio elaborazione evento per {zona}...")
+    
     try:
         app_smart_city.invoke(stato_iniziale)
     except Exception as e:
         print(f"[ERRORE AI CORE] Crash durante l'esecuzione del grafo: {e}")
+    finally:
+        buffer_key = f"smartcity:buffer_eventi:{zona}"
+        lock_key = f"lock_analisi:{zona}"
+        
+        eventi_in_buffer = r.lrange(buffer_key, 0, -1)
+        
+        if eventi_in_buffer:
+            print(f"\n[AI CORE] Trovati {len(eventi_in_buffer)} nuovi eventi nel buffer per {zona}!")
+            print(f"[AI CORE] Riavvio immediato dell'analisi per processare i nuovi dati critici.")
+            
+            r.delete(buffer_key)
+            
+    
+            r.set(lock_key, "1", ex=30)
+
+            ultimo_evento = eventi_in_buffer[-1]
+            r.rpush("smartcity:coda_lavori", ultimo_evento)
+        else:
+
+            r.delete(lock_key)
+            print(f"[AI CORE] Analisi completata. Lock rilasciato per {zona}.")
 
 print("\nAvvio AI Orchestrator (LangGraph + Llama 3.2)...")
 print(f"In ascolto continuo sulla coda Redis 'smartcity:coda_lavori' con {NUMERO_WORKER_PARALLELI} worker...")
