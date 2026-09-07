@@ -619,16 +619,6 @@ workflow.add_conditional_edges(
 
 app_smart_city = workflow.compile()
 
-try:
-    print("\n[SISTEMA] Generazione dell'immagine del grafo in corso...")
-    immagine_grafo = app_smart_city.get_graph().draw_mermaid_png()
-    
-    with open("architettura_digital_twin.png", "wb") as file_immagine:
-        file_immagine.write(immagine_grafo)
-        
-    print("[SISTEMA] Diagramma salvato con successo come 'architettura_digital_twin.png'")
-except Exception as e:
-    print(f"[SISTEMA] Attenzione: impossibile generare o salvare l'immagine del grafo: {e}")
 
 r = redis.Redis(
     host=REDIS_HOST, 
