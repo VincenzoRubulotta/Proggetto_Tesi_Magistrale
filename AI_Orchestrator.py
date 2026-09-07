@@ -395,6 +395,8 @@ def nodo_comandante(evento):
             }
             dispositivi_formattati.append(info_dict)
 
+    dispositivi_formattati = sorted(dispositivi_formattati, key=lambda x: x['DISTANZA_METRI'])
+
     dispositivi_str = json.dumps(dispositivi_formattati, indent=2)
 
     prompt_comandante = f"""Sei il Comandante Operativo delle Forze di Sicurezza e Soccorso della Smart City.
