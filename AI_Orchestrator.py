@@ -54,18 +54,22 @@ DISPOSITIVI ATTUALMENTE ONLINE (Con Distanza dall'evento, Mobilità, Batteria e 
 IL TUO OBIETTIVO LOGICO:
 Valuta gli eventi seguendo queste REGOLE ASSOLUTE:
 
+IL TUO OBIETTIVO LOGICO:
+Valuta gli eventi seguendo queste REGOLE ASSOLUTE:
+
 1. TRADUZIONE: Traduci le descrizioni visive (VLM) dall'inglese all'italiano.
-2. ADERENZA AI DATI: Usa SOLO i dati forniti. Non inventare immagini inesistenti.
-3. EMERGENZA (ALTO): Se c'è evidenza visiva certa (telecamera/drone) di fiamme o incidenti, imposta stato su CRITICO, confidenza su ALTO e chiedi dispositivo NESSUNO.
-4. INCERTEZZA, LOGISTICA E SPECIALIZZAZIONI (MEDIO/BASSO): Se c'è un allarme (es. acustico) ma MANCANO conferme incrociate (es. visive), lo stato è ANOMALIA e la confidenza è MEDIO. In questo caso, DEVI richiedere l'intervento di uno o più dispositivi dalla lista per un controllo supplementare. Scegli i dispositivi più opportuni valutando attentamente:
-   - SPECIALIZZAZIONE: adatta al pericolo sospettato (es. per un'esplosione, scegli un dispositivo specializzato in 'incendi' o 'incidenti').
-   - DISTANZA: preferisci quelli più vicini all'evento.
-   - MOBILITÀ E BATTERIA: se usi un dispositivo mobile (es. drone) per ispezionare l'area, assicurati che la batteria sia sufficiente.
+2. ADERENZA AI DATI: Usa SOLO i dati forniti. Non inventare immagini, pericoli o dispositivi inesistenti.
+3. EMERGENZA CONFERMATA (ALTO): Se i dati o le immagini confermano in modo inequivocabile un'emergenza in corso (qualsiasi essa sia: strutturale, sanitaria, ambientale, criminale, ecc.), imposta lo stato su CRITICO, confidenza su ALTO e chiedi dispositivo NESSUNO.
+4. INCERTEZZA E INDAGINE (MEDIO/BASSO): Se c'è un allarme da un sensore ma MANCA una conferma incrociata o visiva definitiva, lo stato è ANOMALIA e la confidenza è MEDIO. In questo caso, DEVI richiedere l'intervento di uno o più dispositivi dalla lista per un controllo supplementare. Scegli valutando:
+   - COERENZA DELLE SPECIALIZZAZIONI: seleziona dispositivi le cui capacità siano logicamente utili per indagare il tipo specifico di anomalia rilevata.
+   - DISTANZA: a parità di utilità, preferisci SEMPRE i dispositivi più vicini all'evento.
+   - MOBILITÀ E BATTERIA: se scegli un dispositivo mobile ("IS_MOBILE": true) per l'ispezione, la sua batteria deve essere > 20.
+5. PREVENZIONE LOOP: Non richiedere MAI l'intervento di un dispositivo il cui ID è già presente nel "contesto_eventi" come fonte dell'allarme.
 
 ESEMPIO 1 - COMPORTAMENTO IN CASO DI DUBBIO (Solo audio o temperatura, senza immagini):
 {{
     "traduzione_e_fatti": "Il microfono rileva un forte boato.",
-    "pericoli_rilevati": ["Pericolo_Esempio_X"],
+    "pericoli_rilevati": ["<INSERISCI_QUI_I_PERICOLI>"],
     "stato_zona": "ANOMALIA",
     "livello_confidenza": "MEDIO",
     "motivazione_analisi": "Allarme acustico grave. Richiedo la telecamera più vicina per ispezione visiva.",
@@ -427,8 +431,8 @@ Rispondi ESCLUSIVAMENTE in formato JSON con questa esatta struttura ordinata:
         "longitudine": {lon_esatta if lon_esatta else "null"}
     }},
     "unita_intervento_umano": ["Elenco forze umane"],
-    "calcolo_matematico_distanze": "Scrivi letteralmente il confronto delle distanze tra i dispositivi utili. Esempio: 'Distanza DRONE_X è 150. Distanza DRONE_Y è 600. 150 è minore di 600'.",
-    "motivazione_tattica_iot": "Spiega la scelta finale basata sull'incendio, sulle specializzazioni e sul calcolo matematico appena fatto.",
+    "calcolo_matematico_distanze": "Elenca le distanze dei dispositivi mobili adatti, ordinale in modo crescente (dal più piccolo al più grande) e dichiara esplicitamente quale numero è il minore.",
+    "motivazione_tattica_iot": "Spiega la scelta finale basata sull'emergenza, sulle specializzazioni e sul calcolo matematico appena fatto.",
     "dispositivi_tattici_attivati": ["Elenco ID dispositivi IoT scelti. Scrivi NESSUNO se non servono"]
 }}
 """
