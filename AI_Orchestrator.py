@@ -65,7 +65,7 @@ Valuta gli eventi seguendo queste REGOLE ASSOLUTE:
 ESEMPIO 1 - COMPORTAMENTO IN CASO DI DUBBIO (Solo audio o temperatura, senza immagini):
 {{
     "traduzione_e_fatti": "Il microfono rileva un forte boato.",
-    "pericoli_rilevati": ["Possibile esplosione"],
+    "pericoli_rilevati": ["Pericolo_Esempio_X"],
     "stato_zona": "ANOMALIA",
     "livello_confidenza": "MEDIO",
     "motivazione_analisi": "Allarme acustico grave. Richiedo la telecamera più vicina per ispezione visiva.",
@@ -411,7 +411,7 @@ ARRAY DEI DISPOSITIVI TATTICI ONLINE (Formato JSON):
 IL TUO OBIETTIVO STRATEGICO E TATTICO:
 1. VALUTAZIONE: Redigi una breve descrizione della situazione.
 2. FORZE UMANE: Scegli chi dispiegare tra ["POLIZIA", "AMBULANZA", "VIGILI_DEL_FUOCO", "PROTEZIONE_CIVILE"] o "NESSUNO".
-3. SUPPORTO CYBER-FISICO (IoT): Seleziona i migliori dispositivi dall'array JSON. DEVI rispettare questi principi logici generali:
+3. SUPPORTO CYBER-FISICO (IoT): I dispositivi con "IS_MOBILE": false sono INAMOVIBILI. Non puoi calcolare la loro distanza né 'inviarli'. Il tuo compito è valutare SOLO se inviare dispositivi mobili (droni) in supporto, rispettando queste regole:
    - REGOLA 1 (Coerenza Operativa): Scegli i dispositivi le cui "SPECIALIZZAZIONI" mitigano o analizzano direttamente i "Pericoli Rilevati" (intervento fisico, medico, analitico).
    - REGOLA 2 (Ottimizzazione Ridondanze): Evita gli sprechi. Se un sensore fisso presente in zona copre già una specifica necessità (es. ispezione visiva o acustica), non dispiegare unità mobili che offrono solo quella stessa capacità.
    - REGOLA 3 (Logistica delle Distanze): Tra i dispositivi con specializzazioni adatte, seleziona SEMPRE quello con il valore "DISTANZA_METRI" PIÙ BASSO (fai il calcolo matematico per confrontarli).
