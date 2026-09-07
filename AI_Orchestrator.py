@@ -124,6 +124,8 @@ class SmartCityState(TypedDict):
     contesto_eventi: List[Dict[str, Any]]
     dispositivi_attivi: List[str]
     analisi_json: Optional[Dict[str, Any]]
+    raw_text: Optional[str]        
+    errore_parsing: Optional[str]
 
 # 2. I NODI (Workers)
 def nodo_investigatore(state: SmartCityState) -> SmartCityState:
@@ -219,32 +221,71 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
 
         print(f"\n[DEBUG INVESTIGATORE] Dispositivi attivi passati all'LLM: {state['dispositivi_attivi']}")
 
-        risultato = analisi_chain.invoke({
+        risposta_grezza = (prompt | llm).invoke({
             "nome_zona": state["zona"],
             "contesto_eventi": json.dumps(state["contesto_eventi"], ensure_ascii=False),
-            "dispositivi_attivi": "\n".join(dispositivi_formattati) if dispositivi_formattati else "Nessun dispositivo disponibile."
+            "dispositivi_attivi": "\n".join(dispositivi_formattati) if dispositivi_formattati else "Nessun dispositivo."
         })
         
-        if isinstance(risultato, str):
-            try:
-                testo_pulito = risultato.replace("```json", "").replace("```", "").strip()
-                risultato = json.loads(testo_pulito)
-            except json.JSONDecodeError:
-                risultato = {
-                    "stato_zona": "ANOMALIA",
-                    "livello_confidenza": "MEDIO",
-                    "motivazione_analisi": f"Errore di parsing JSON dalla risposta LLM: {risultato}"
-                }
-
-        print(f"[DEBUG INVESTIGATORE] Risposta grezza LLM (Analisi JSON): {risultato}")
-        print(f"Esito: {risultato.get('stato_zona')} (Confidenza: {risultato.get('livello_confidenza')})")
-
-        state["analisi_json"] = risultato 
+        try:
+            testo_pulito = risposta_grezza.replace("```json", "").replace("```", "").strip()
+            if "{" in testo_pulito and "}" in testo_pulito:
+                testo_pulito = testo_pulito[testo_pulito.find("{"):testo_pulito.rfind("}")+1]
+                
+            risultato = json.loads(testo_pulito)
+            state["analisi_json"] = risultato
+            state["errore_parsing"] = None
+            print(f"[DEBUG INVESTIGATORE] Analisi JSON completata con successo.")
+            
+        except json.JSONDecodeError as e:
+            print(f"[ALLARME] L'LLM ha generato un JSON corrotto! Attivo il Nodo Correttore...")
+            state["raw_text"] = risposta_grezza
+            state["errore_parsing"] = str(e)
+            
     except Exception as e:
-        print(f"[ERRORE LLM]: {e}")
+        print(f"[ERRORE LLM CRITICO]: {e}")
         state["analisi_json"] = {"stato_zona": "ERRORE", "livello_confidenza": "BASSO"}
+        
     return state
-  
+
+def nodo_correttore(state: SmartCityState) -> SmartCityState:
+    print(f"\n[NODO CORRETTORE] Tento di riparare la formattazione per la zona: {state['zona']}")
+    
+    template_correzione = """Hai generato un JSON non valido. 
+Errore riscontrato dal parser: {errore}
+
+Testo originale difettoso:
+{testo_raw}
+
+Correggi l'errore di sintassi e restituisci ESCLUSIVAMENTE il JSON valido, senza testo o markdown.
+"""
+    prompt_corr = PromptTemplate(template=template_correzione, input_variables=["errore", "testo_raw"])
+    risposta_grezza = (prompt_corr | llm).invoke({
+        "errore": state.get("errore_parsing", "Errore JSON generico"),
+        "testo_raw": state.get("raw_text", "")
+    })
+    
+    try:
+        testo_pulito = risposta_grezza.replace("```json", "").replace("```", "").strip()
+        if "{" in testo_pulito and "}" in testo_pulito:
+            testo_pulito = testo_pulito[testo_pulito.find("{"):testo_pulito.rfind("}")+1]
+            
+        risultato = json.loads(testo_pulito)
+        state["analisi_json"] = risultato
+        state["errore_parsing"] = None
+        print("[NODO CORRETTORE] JSON riparato e salvato con successo!")
+    except Exception as e:
+        print(f"[NODO CORRETTORE] Fallimento irreparabile. Attivo Fallback di emergenza.")
+        state["analisi_json"] = {
+            "stato_zona": "ANOMALIA",
+            "livello_confidenza": "MEDIO",
+            "motivazione_analisi": "Errore critico di parsing persistente.",
+            "id_dispositivi_richiesti": []
+        }
+        state["errore_parsing"] = None
+        
+    return state
+
 def nodo_router(state: SmartCityState) -> SmartCityState:
     print(f"\n[NODO 2: ROUTER] Ricerca dati supplementari in corso...")
     zona = state["zona"]
@@ -532,15 +573,32 @@ def decide_dopo_router(state: SmartCityState) -> str:
     
     return "fine"
 
+def check_errori_investigatore(state: SmartCityState) -> str:
+    if state.get("errore_parsing"):
+        return "correttore"
+    return decide_prossimo_nodo(state)
+
 # 4. ASSEMBLAGGIO DEL GRAFO
 workflow = StateGraph(SmartCityState)
 workflow.add_node("investigatore", nodo_investigatore)
+workflow.add_node("correttore", nodo_correttore)
 workflow.add_node("router", nodo_router)
 workflow.add_node("comandante", nodo_comandante)
 
 workflow.set_entry_point("investigatore")
 workflow.add_conditional_edges(
     "investigatore",
+    check_errori_investigatore,
+    {
+        "correttore": "correttore",
+        "router": "router",
+        "comandante": "comandante",
+        "fine": END
+    }
+)
+
+workflow.add_conditional_edges(
+    "correttore",
     decide_prossimo_nodo,
     {
         "router": "router",
@@ -548,7 +606,6 @@ workflow.add_conditional_edges(
         "fine": END
     }
 )
-
 
 workflow.add_edge("comandante", END)
 workflow.add_conditional_edges(
@@ -561,6 +618,17 @@ workflow.add_conditional_edges(
 )
 
 app_smart_city = workflow.compile()
+
+try:
+    print("\n[SISTEMA] Generazione dell'immagine del grafo in corso...")
+    immagine_grafo = app_smart_city.get_graph().draw_mermaid_png()
+    
+    with open("architettura_digital_twin.png", "wb") as file_immagine:
+        file_immagine.write(immagine_grafo)
+        
+    print("[SISTEMA] Diagramma salvato con successo come 'architettura_digital_twin.png'")
+except Exception as e:
+    print(f"[SISTEMA] Attenzione: impossibile generare o salvare l'immagine del grafo: {e}")
 
 r = redis.Redis(
     host=REDIS_HOST, 
