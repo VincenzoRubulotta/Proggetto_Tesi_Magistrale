@@ -1,16 +1,20 @@
 ```plaintext
-/PROGGETTO_TESI_MAGISTRALE
-├── .env                   # Variabili d'ambiente (configurazioni MQTT, Redis, LangChain, ecc.)
-├── docker-compose.yml     # Configurazione dei 4 servizi containerizzati e delle reti
-├── Dockerfile             # Istruzioni per la build dell'immagine Python universale
-├── requirements.txt       # Dipendenze del progetto (MQTT, LangChain, Flask, Redis, ecc.)
-├── Gateway_IoT.py         # Microservizio 1: Intercetta i sensori MQTT e scrive su Redis
-├── Storage_Immagini.py    # Microservizio 2: Server Flask per upload/download file locali
-├── AI_Orchestrator.py     # Microservizio 3: Cervello AI con LangGraph, Llama 3.2 e Moondream
-├── memoria.py             # Modulo condiviso: Gestione della memoria spazio-temporale
-├── registro.py            # Modulo condiviso: Mappatura dei dispositivi IoT attivi
-├── schema.py              # Modelli dati Pydantic per la validazione degli input
-└── README.md              # Questo file di documentazione
+/PROGETTO_TESI_MAGISTRALE
+├── dashboard/             # App Flask/Leaflet per la visualizzazione Real-Time della mappa
+├── Logica_di_Test/        # Script per la simulazione deterministica End-to-End
+│   ├── Data_Pool/         # Immagini di test (CRITICO/NORMALE) per l'analisi visiva (VLM)
+│   └── device_node.py     # Simulatore interattivo dei dispositivi IoT
+├── .env                   # Variabili d'ambiente (configurazioni LangChain, porte, ecc.)
+├── docker-compose.yml     # Configurazione per l'orchestrazione dei 6 servizi containerizzati
+├── Dockerfile             # Istruzioni per la build dell'immagine Python di backend
+├── Gateway_IoT.py         # Microservizio: Intercetta i sensori MQTT e scrive su buffer Redis
+├── Storage_Immagini.py    # Microservizio: Server Flask locale per upload/download foto
+├── AI_Orchestrator.py     # Microservizio: Cervello AI con LangGraph (Investigatore, Router, Comandante)
+├── prompts.py             # Modulo: Centralizzazione dei template di Prompt Engineering
+├── utils.py               # Modulo: Helper per calcolo distanze GPS, parsing visivo (VLM) e formattazione
+├── memoria.py             # Modulo: Gestione della finestra spazio-temporale degli eventi su Redis
+├── registro.py            # Modulo: Mappatura, Heartbeat e distanze dei dispositivi IoT
+└── schema.py              # Modelli dati Pydantic per la validazione dello scudo input
 ```
 
 
