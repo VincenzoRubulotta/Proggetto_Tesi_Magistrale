@@ -141,7 +141,6 @@ class DispositivoNodo:
             
         if comando == "RICHIEDI_DATO_EMERGENZA":
             log_to_dashboard(client, f"[{DEVICE_ID}] Orchestratore richiede verifica. Invio conferma emergenza...")
-            # Forziamo il CRITICO per mantenere il "Flusso Demo" fluido
             self.invia_simulazione(client, scenario="CRITICO")
 
         elif comando == "DISPIEGAMENTO_TATTICO":
@@ -171,18 +170,31 @@ log_to_dashboard(client, f"[{DEVICE_ID}] ONLINE! Modalità Test controllato.")
 try:
     while True:
         print(f"\n=== CONTROLLO MANUALE ({DEVICE_ID}) ===")
-        print("1 - INNESCA EMERGENZA (Invia foto/dati critici)")
-        print("2 - CESSATO ALLARME (Invia foto/dati normali)")
-        scelta = input("Seleziona lo scenario (1 o 2): ").strip()
-        
-        if scelta == '1':
-            log_to_dashboard(client, f"[{DEVICE_ID}] Lancio scenario CRITICO...")
-            nodo.invia_simulazione(client, scenario="CRITICO")
-        elif scelta == '2':
-            log_to_dashboard(client, f"[{DEVICE_ID}] Lancio scenario NORMALE...")
-            nodo.invia_simulazione(client, scenario="NORMALE")
+
+        if TIPO in ["telecamera", "drone"]:
+            print("1 - INNESCA EMERGENZA (Invia foto critica)")
+            print("2 - CESSATO ALLARME (Invia foto di normalità)")
+            scelta = input("Seleziona lo scenario (1 o 2): ").strip()
+            
+            if scelta == '1':
+                log_to_dashboard(client, f"[{DEVICE_ID}] Lancio scenario CRITICO...")
+                nodo.invia_simulazione(client, scenario="CRITICO")
+            elif scelta == '2':
+                log_to_dashboard(client, f"[{DEVICE_ID}] Lancio scenario NORMALE...")
+                nodo.invia_simulazione(client, scenario="NORMALE")
+            else:
+                print("Scelta non valida. Premi 1 o 2.")
+
         else:
-            print("Scelta non valida. Premi 1 o 2.")
+            print("Premi INVIO per inviare un'ANOMALIA.")
+            print("Scrivi 'exit' per uscire.")
+            scelta = input("Azione: ").strip().lower()
+            
+            if scelta == 'exit':
+                break
+            else:
+                log_to_dashboard(client, f"[{DEVICE_ID}] Lancio trigger anomalia ({TIPO})...")
+                nodo.invia_simulazione(client, scenario="CRITICO")
             
 except KeyboardInterrupt:
     log_to_dashboard(client, f"[{DEVICE_ID}] Spegnimento...")
