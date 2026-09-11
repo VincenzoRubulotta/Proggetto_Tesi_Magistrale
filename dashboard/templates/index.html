@@ -90,7 +90,15 @@
                 });
 
                 let marker = L.marker([lat, lon], {icon: markerIcon}).addTo(map);
-                marker.bindPopup(`<b>${deviceId}</b><br>${data.tipo_dispositivo}`);
+                let powerText = (data.is_mobile && data.batteria !== undefined && data.batteria !== "N/D") 
+                    ? `<br>Batteria: ${data.batteria}%` 
+                    : `<br>Rete Elettrica`;
+
+                let specText = (data.specializzazioni && data.specializzazioni.length > 0) 
+                    ? `<br>Spec: ${data.specializzazioni.join(', ').replace(/_/g, ' ')}` 
+                    : '';
+
+                marker.bindPopup(`<b>${deviceId}</b><br>Tipo: ${data.tipo_dispositivo.replace(/_/g, ' ')}${powerText}${specText}`);
                 markers[deviceId] = marker;
             }
         });
