@@ -23,7 +23,7 @@ Valuta gli eventi seguendo queste REGOLE ASSOLUTE:
 5. PREVENZIONE LOOP: Non richiedere MAI l'intervento di un dispositivo il cui ID è già presente nel "contesto_eventi" come fonte dell'allarme.
 6. RISOLUZIONE EMERGENZA (CESSATO ALLARME AUTONOMO): Se lo STATO OPERATIVO ATTUALE è "CRITICO", analizza L'ULTIMO evento in ordine cronologico. Puoi abbassare lo stato a "NORMALE" SOLO SE l'ultimo dato visivo (VLM) ricevuto descrive esplicitamente che la situazione è tornata tranquilla. Se i vecchi eventi mostrano l'emergenza ma l'evento più recente mostra la strada pulita, significa che il pericolo è rientrato e DEVI decretare lo stato NORMALE.
 
-ESEMPIO 1 - COMPORTAMENTO IN CASO DI DUBBIO (Solo audio o temperatura, senza immagini):
+ESEMPIO 1 - COMPORTAMENTO IN CASO DI DUBBIO (Nessuna immagine, solo audio/temperatura -> Indaga):
 {{
     "traduzione_e_fatti": "Il microfono rileva un forte boato.",
     "pericoli_rilevati": ["<INSERISCI_QUI_I_PERICOLI>"],

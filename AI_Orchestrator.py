@@ -272,17 +272,6 @@ def nodo_comandante(evento):
     contesto_eventi = evento.get("contesto_eventi", [])
     analisi = evento.get("analisi_json", {})
     dispositivi_attivi = evento.get("dispositivi_attivi", [])
-    
-    for ev in contesto_eventi:
-        if "analisi_telecamera_vlm" in ev and ev.get("posizione") and ev["posizione"].get("coordinate"):
-            lat_esatta = ev["posizione"]["coordinate"].get("latitudine")
-            lon_esatta = ev["posizione"]["coordinate"].get("longitudine")
-            break
-            
-    if lat_esatta is None or lon_esatta is None:
-        if contesto_eventi and "posizione" in contesto_eventi[0] and contesto_eventi[0]["posizione"].get("coordinate"):
-            lat_esatta = contesto_eventi[0]["posizione"]["coordinate"].get("latitudine")
-            lon_esatta = contesto_eventi[0]["posizione"]["coordinate"].get("longitudine")
             
     coordinate_str = f"Latitudine: {lat_esatta}, Longitudine: {lon_esatta}" if lat_esatta else "Non specificate"
     dispositivi_trigger = list(set([ev.get("id_dispositivo") for ev in contesto_eventi if "id_dispositivo" in ev]))
