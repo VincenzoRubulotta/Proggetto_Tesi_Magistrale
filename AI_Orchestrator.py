@@ -111,6 +111,9 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
                 gestore_registro.r.set(f"smartcity:stato_emergenza:{epicentro_id}", "NORMALE")
                 print(f"\n[STATE MACHINE] L'IA ha decretato il CESSATO ALLARME! La zona {epicentro_id} è di nuovo sicura.")
 
+                gestore_registro.r.delete(f"smartcity:memory:{epicentro_id}")
+                gestore_registro.r.zrem("smartcity:epicentri:geo", epicentro_id)
+
             stato_valutato = risultato.get("stato_zona", "NORMALE")
             payload_mappa = {
                 "epicentro_id": epicentro_id, 
