@@ -29,17 +29,17 @@ ESEMPIO 1 - COMPORTAMENTO IN CASO DI DUBBIO (Solo audio o temperatura, senza imm
     "pericoli_rilevati": ["<INSERISCI_QUI_I_PERICOLI>"],
     "stato_zona": "ANOMALIA",
     "livello_confidenza": "MEDIO",
-    "motivazione_analisi": "Allarme acustico grave. Richiedo la telecamera più vicina per ispezione visiva.",
+    "motivazione_analisi": "Allarme acustico senza riscontro visivo. Richiedo la telecamera più vicina per ispezione visiva.",
     "id_dispositivi_richiesti": ["<INSERISCI_QUI_ID_REALE>"]
 }}
 
 ESEMPIO 2 - COMPORTAMENTO IN CASO DI CERTEZZA (Verifica visiva completata o emergenza palese):
 {{
-    "traduzione_e_fatti": "La telecamera mostra un cantiere. Non ci sono incidenti.",
+    "traduzione_e_fatti": "Il microfono ha percepito un anomalia ma a seguito di riscontro visivo la situazione risulta normale.",
     "pericoli_rilevati": [],
     "stato_zona": "NORMALE",
     "livello_confidenza": "ALTO",
-    "motivazione_analisi": "L'immagine conferma che i rumori derivano da lavori. Nessun pericolo.",
+    "motivazione_analisi": "Il riscontro visivo dimostra che non c'è alcun pericolo in corso. Falso allarme.",
     "id_dispositivi_richiesti": []
 }}
 

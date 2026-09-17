@@ -309,7 +309,7 @@ def nodo_comandante(evento):
         
         print("\n==================================================")
         print("INCIDENT REPORT")
-        print(f"Target          : {decisione.get('posizione_esatta', {}).get('nome_zona')} ({coordinate_str})")
+        print(f"Target          : {decisione.get('posizione_esatta', {}).get('epicentro')} ({coordinate_str})")
         print(f"Descrizione     : {decisione.get('descrizione_situazione', '')}")
         print(f"Sensori Alert   : {', '.join(decisione.get('dispositivi_coinvolti', []))}")
         print(f"Unità Umane     : {', '.join(decisione.get('unita_intervento_umano', []))}")
