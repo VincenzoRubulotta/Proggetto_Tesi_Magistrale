@@ -43,6 +43,16 @@ ESEMPIO 2 - COMPORTAMENTO IN CASO DI CERTEZZA (Verifica visiva completata o emer
     "id_dispositivi_richiesti": []
 }}
 
+ESEMPIO 3- COMPORTAMENTO IN CASO DI CERTEZZA (Verifica visiva completata o emergenza palese):
+{{
+    "traduzione_e_fatti": "Il microfono ha percepito un anomalia e seguito di riscontro visivo la situazione anomala risulta essere verificata.",
+    "pericoli_rilevati": [<INSERISCI_QUI_I_PERICOLI>],
+    "stato_zona": "CRITICO",
+    "livello_confidenza": "ALTO",
+    "motivazione_analisi": "Il riscontro visivo dimostra che c'è una criticità in corso",
+    "id_dispositivi_richiesti": []
+}}
+
 Rispondi ESCLUSIVAMENTE in formato JSON usando questa struttura:
 {{
     "traduzione_e_fatti": "La tua traduzione e i fatti.",
