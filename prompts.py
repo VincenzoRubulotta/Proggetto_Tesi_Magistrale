@@ -1,12 +1,13 @@
 # prompts.py
 
 TEMPLATE_INVESTIGATORE = """Sei il Cervello Analitico del Digital Twin di una Smart City.
-Stai monitorando la zona urbana: {nome_zona}.
+Stai monitorando un epicentro alle coordinate GPS: {coordinate_epicentro}. 
+La tua area di analisi attiva è un raggio tattico ristretto di 100 metri.
 
-Ecco il resoconto degli eventi IoT registrati negli ultimi 120 secondi:
+Ecco il resoconto degli eventi IoT registrati negli ultimi 120 secondi all'epicentro:
 {contesto_eventi}
 
-DISPOSITIVI ATTUALMENTE ONLINE (Con Distanza dall'evento, Mobilità, Batteria e Specializzazioni):
+DISPOSITIVI ATTUALMENTE DISPONIBILI (I sensori fissi mostrati sono tutti entro i 100m. I droni mobili possono arrivare da più lontano):
 {dispositivi_attivi}
 
 IL TUO OBIETTIVO LOGICO:
@@ -62,7 +63,7 @@ Testo originale difettoso:
 Correggi l'errore di sintassi e restituisci ESCLUSIVAMENTE il JSON valido, senza testo o markdown.
 """
 
-def get_prompt_comandante(zona, coordinate_str, dispositivi_trigger, motivazione_analisi, pericoli_rilevati, dispositivi_str, lat_esatta, lon_esatta):
+def get_prompt_comandante(epicentro_id, coordinate_str, dispositivi_trigger, motivazione_analisi, pericoli_rilevati, dispositivi_str, lat_esatta, lon_esatta):
     """Genera dinamicamente il prompt per il Comandante inserendo le variabili formattate."""
     lat_val = lat_esatta if lat_esatta is not None else "null"
     lon_val = lon_esatta if lon_esatta is not None else "null"
@@ -71,7 +72,7 @@ def get_prompt_comandante(zona, coordinate_str, dispositivi_trigger, motivazione
 Stai valutando una potenziale emergenza.
 
 DATI DELL'EVENTO:
-- Zona: {zona}
+- Epicentro ID: {epicentro_id}
 - Coordinate GPS: {coordinate_str}
 - Dispositivi che hanno lanciato l'alert: {dispositivi_trigger}
 
@@ -84,7 +85,7 @@ ARRAY DEI DISPOSITIVI TATTICI ONLINE (Formato JSON):
 
 IL TUO OBIETTIVO STRATEGICO E TATTICO:
 1. VALUTAZIONE: Redigi una breve descrizione della situazione.
-2. FORZE UMANE: Scegli chi dispiegare tra ["POLIZIA", "AMBULANZA", "VIGILI_DEL_FUOCO", "PROTEZIONE_CIVILE"] o "NESSUNO".
+2. FORZE UMANE: Scegli chi dispiegare tra ["POLIZIA", "AMBULANZA", "VIGILI_DEL_FUOCO", "PROTEZIONE_CIVILE"] o "NESSUNO" scegliendo quale tra questi servizi di intervento umano sono più appropriati per risolvere e o dare aiuto nella situazione che hai analizzato.
 3. SUPPORTO CYBER-FISICO (IoT): I dispositivi con "IS_MOBILE": false sono INAMOVIBILI. Non puoi calcolare la loro distanza né 'inviarli'. Il tuo compito è valutare SOLO se inviare dispositivi mobili (droni) in supporto, rispettando queste regole:
    - REGOLA 1 (Coerenza Operativa): Scegli i dispositivi le cui "SPECIALIZZAZIONI" mitigano o analizzano direttamente i "Pericoli Rilevati" (intervento fisico, medico, analitico).
    - REGOLA 2 (Ottimizzazione Ridondanze): Evita gli sprechi. Se un sensore fisso presente in zona copre già una specifica necessità (es. ispezione visiva o acustica), non dispiegare unità mobili che offrono solo quella stessa capacità.
@@ -96,7 +97,7 @@ Rispondi ESCLUSIVAMENTE in formato JSON con questa esatta struttura ordinata:
     "descrizione_situazione": "Descrizione dell'emergenza.",
     "dispositivi_coinvolti": ["Elenco ID dei dispositivi che hanno rilevato l'anomalia"],
     "posizione_esatta": {{
-        "nome_zona": "{zona}",
+        "epicentro": "{epicentro_id}",,
         "latitudine": {lat_val},
         "longitudine": {lon_val}
     }},

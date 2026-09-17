@@ -21,6 +21,7 @@ def on_connect(client, userdata, flags, reason_code, properties):
     print("Connesso al broker MQTT per la Dashboard!")
     client.subscribe("smartcity/heartbeat/#")
     client.subscribe("smartcity/logs/#")
+    client.subscribe("smartcity/mappa/#")
 
 def on_message(client, userdata, msg):
     try:
@@ -34,6 +35,9 @@ def on_message(client, userdata, msg):
             
         elif topic.startswith("smartcity/heartbeat/"):
             socketio.emit('map_update', payload)
+            
+        elif topic.startswith("smartcity/mappa/"):
+            socketio.emit('emergency_circle', payload)
             
     except Exception as e:
 

@@ -135,6 +135,32 @@
                 markers[deviceId] = marker;
             }
         });
+
+        var emergencyCircles = {};
+
+        socket.on('emergency_circle', function(data) {
+            let epi = data.epicentro_id;
+            
+            if (emergencyCircles[epi]) {
+                map.removeLayer(emergencyCircles[epi]);
+                delete emergencyCircles[epi];
+            }
+            
+            if (data.stato === "NORMALE") {
+                return;
+            }
+            
+            let circleColor = data.stato === "CRITICO" ? "#ff4c4c" : "#ffcc00";
+            
+            let circle = L.circle([data.lat, data.lon], {
+                color: circleColor,
+                fillColor: circleColor,
+                fillOpacity: 0.2,
+                radius: 100 
+            }).addTo(map);
+            
+            emergencyCircles[epi] = circle;
+        });
     </script>
 </body>
 </html>

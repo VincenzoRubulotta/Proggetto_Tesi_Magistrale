@@ -41,20 +41,21 @@ def formatta_dispositivi_investigatore(dispositivi_attivi, lat_evento, lon_event
     dispositivi_formattati = []
     for disp in dispositivi_attivi: 
         if isinstance(disp, str):
-            try:
-                disp = json.loads(disp)
-            except json.JSONDecodeError:
-                dispositivi_formattati.append(f"- {disp}")
-                continue
+            try: disp = json.loads(disp)
+            except json.JSONDecodeError: continue
         
         if isinstance(disp, dict):
             lat_disp = disp.get("posizione", {}).get("coordinate", {}).get("latitudine")
             lon_disp = disp.get("posizione", {}).get("coordinate", {}).get("longitudine")
             
             distanza = calcola_distanza(lat_evento, lon_evento, lat_disp, lon_disp)
-            dist_str = f"{distanza:.0f}m" if distanza != float('inf') else "Sconosciuta"
+            is_mobile = "drone" in disp.get('tipo_dispositivo', '').lower() or disp.get("is_mobile") == True
             
-            mob = "SÌ" if disp.get("is_mobile") else "NO"
+            if not is_mobile and distanza > 100:
+                continue
+                
+            dist_str = f"{distanza:.0f}m" if distanza != float('inf') else "Sconosciuta"
+            mob = "SÌ" if is_mobile else "NO"
             batt = f"{disp.get('batteria')}%" if disp.get("batteria") else "N/D"
             spec = ", ".join(disp.get("specializzazioni", []))
             
@@ -64,14 +65,11 @@ def formatta_dispositivi_investigatore(dispositivi_attivi, lat_evento, lon_event
     return dispositivi_formattati
 
 def ordina_e_taglia_dispositivi_comandante(dispositivi_attivi, lat_esatta, lon_esatta, max_items=None):
-    """Calcola distanze, ordina l'array e restituisce i Top N in formato JSON."""
     dispositivi_formattati = []
     for disp in dispositivi_attivi:
         if isinstance(disp, str):
-            try:
-                disp = json.loads(disp)
-            except json.JSONDecodeError:
-                continue
+            try: disp = json.loads(disp)
+            except json.JSONDecodeError: continue
                 
         if isinstance(disp, dict):
             lat_disp = disp.get("posizione", {}).get("coordinate", {}).get("latitudine")
@@ -81,22 +79,21 @@ def ordina_e_taglia_dispositivi_comandante(dispositivi_attivi, lat_esatta, lon_e
             distanza_int = int(distanza) if distanza != float('inf') else 9999
             
             is_mobile = "drone" in disp.get('tipo_dispositivo', '').lower() or disp.get("is_mobile") == True
-            batteria = int(disp.get('batteria', 100))
-            spec = disp.get("specializzazioni", [])
             
+            if not is_mobile and distanza > 100:
+                continue
+                
             info_dict = {
                 "ID": disp.get('id_dispositivo', 'SCONOSCIUTO'),
                 "TIPO": disp.get('tipo_dispositivo', 'sconosciuto'),
                 "IS_MOBILE": is_mobile,
                 "DISTANZA_METRI": distanza_int,
-                "BATTERIA_PERCENTUALE": batteria,
-                "SPECIALIZZAZIONI": spec
+                "BATTERIA_PERCENTUALE": int(disp.get('batteria', 100)),
+                "SPECIALIZZAZIONI": disp.get("specializzazioni", [])
             }
             dispositivi_formattati.append(info_dict)
-
+            
     dispositivi_ordinati = sorted(dispositivi_formattati, key=lambda x: x['DISTANZA_METRI'])
-
     if max_items is None:
         return json.dumps(dispositivi_ordinati, indent=2)
-    
     return json.dumps(dispositivi_ordinati[:max_items], indent=2)

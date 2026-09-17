@@ -46,22 +46,24 @@ def on_message(client_instance, userdata, msg):
             dati_puliti = messaggio_validato.model_dump()
 
             gestore_registro.aggiorna_dispositivo(dati_puliti)
-            zona, contesto_aggiornato = gestore_memoria.aggiungi_e_pulisci(dati_puliti)
-            dispositivi_attivi = gestore_registro.ottieni_dispositivi_attivi(zona)
+            epicentro_id, lat, lon, contesto_aggiornato = gestore_memoria.aggiungi_e_pulisci(dati_puliti)
+            dispositivi_attivi = gestore_registro.ottieni_dispositivi_attivi(lat, lon, raggio_km=10)
 
             stato_iniziale = {
-                "zona": zona,
+                "epicentro_id": epicentro_id,
+                "lat_epicentro": lat,
+                "lon_epicentro": lon,
                 "contesto_eventi": contesto_aggiornato,
                 "dispositivi_attivi": dispositivi_attivi,
                 "analisi_json": None
             }
 
-            if r.set(f"lock_analisi:{zona}", "1", nx=True, ex=30):
-                print(f"[GATEWAY] Inserisco evento per {zona} nella coda principale.")
+            if r.set(f"lock_analisi:{epicentro_id}", "1", nx=True, ex=30):
+                print(f"[GATEWAY] Inserisco evento all'epicentro {epicentro_id} nella coda principale.")
                 r.rpush("smartcity:coda_lavori", json.dumps(stato_iniziale))
             else:
-                print(f"[GATEWAY] AI occupata su {zona}. Salvo il nuovo evento nel Buffer di priorità.")
-                r.rpush(f"smartcity:buffer_eventi:{zona}", json.dumps(stato_iniziale))
+                print(f"[GATEWAY] AI occupata su {epicentro_id}. Salvo nel buffer...")
+                r.rpush(f"smartcity:buffer_eventi:{epicentro_id}", json.dumps(stato_iniziale))
         
     except json.JSONDecodeError as e:
         logging.error(f"Payload malformato: {e}")

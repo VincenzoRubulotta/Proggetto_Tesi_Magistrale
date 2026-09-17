@@ -9,28 +9,35 @@ class RegistroDispositivi:
 
     def aggiorna_dispositivo(self, payload_json):
         """Salva il dispositivo in Redis con un timer di autodistruzione (TTL)."""
-        zona = payload_json.get("posizione", {}).get("nome_zona", "Zona_Sconosciuta")
         id_disp = payload_json.get("id_dispositivo")
-        tipo = payload_json.get("tipo_dispositivo")
-        
         if not id_disp:
             return
 
-        chiave_redis = f"smartcity:registry:{zona}:{id_disp}"
+        coord = payload_json.get("posizione", {}).get("coordinate", {})
+        lat = coord.get("latitudine")
+        lon = coord.get("longitudine")
 
+        if lat is not None and lon is not None:
+            self.r.geoadd("smartcity:registry:geo", (lon, lat, id_disp))
+
+        
+        chiave_dati = f"smartcity:registry:data:{id_disp}"
         valore_stringa = json.dumps(payload_json)
-        self.r.set(chiave_redis, valore_stringa, ex=self.timeout_secondi)
+        self.r.set(chiave_dati, valore_stringa, ex=self.timeout_secondi)
 
-    def ottieni_dispositivi_attivi(self, zona, ts_riferimento=None):
-        """Cerca in Redis i dispositivi attualmente vivi per questa zona."""
-        
-        pattern_ricerca = f"smartcity:registry:{zona}:*"
-        chiavi_attive = self.r.keys(pattern_ricerca)
-        
-        dispositivi_attivi = []
-        for chiave in chiavi_attive:
-            dati_str = self.r.get(chiave)
-            if dati_str:
-                dispositivi_attivi.append(dati_str)
+    def ottieni_dispositivi_attivi(self, lat, lon, raggio_km=10):
+        """Estrae i dispositivi vivi nel macro-raggio (città intera) per trovare i droni."""
+        try:
+            ids_vicini = self.r.georadius("smartcity:registry:geo", lon, lat, raggio_km, unit='km')
+        except Exception:
+            ids_vicini = []
             
+        dispositivi_attivi = []
+        if ids_vicini:
+            chiavi = [f"smartcity:registry:data:{id_d}" for id_d in ids_vicini]
+            dati_raw = self.r.mget(chiavi)
+            for dato in dati_raw:
+                if dato:
+                    dispositivi_attivi.append(dato)
+                    
         return dispositivi_attivi

@@ -57,7 +57,9 @@ client_pub.loop_start()
 
 # 1. (State)
 class SmartCityState(TypedDict):
-    zona: str
+    epicentro_id: str
+    lat_epicentro: float
+    lon_epicentro: float
     contesto_eventi: List[Dict[str, Any]]
     dispositivi_attivi: List[str]
     analisi_json: Optional[Dict[str, Any]]
@@ -66,7 +68,12 @@ class SmartCityState(TypedDict):
 
 # 2. I NODI (Workers)
 def nodo_investigatore(state: SmartCityState) -> SmartCityState:
-    print(f"\n[NODO 1: INVESTIGATORE] Analizzo la zona: {state['zona']}")
+
+    epicentro_id = state['epicentro_id']
+    lat_evento = state['lat_epicentro']
+    lon_evento = state['lon_epicentro']
+
+    print(f"\n[NODO 1: INVESTIGATORE] Analizzo epicentro: {epicentro_id}")
 
     for evento in state["contesto_eventi"]:
         if "immagine_url" in evento and evento["immagine_url"]:
@@ -77,22 +84,16 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
                 evento["analisi_telecamera_vlm"] = descrizione_visiva
 
     try:
-        lat_evento, lon_evento = None, None
-        if state["contesto_eventi"] and "posizione" in state["contesto_eventi"][0]:
-            coord = state["contesto_eventi"][0]["posizione"].get("coordinate")
-            if coord:
-                lat_evento = coord.get("latitudine")
-                lon_evento = coord.get("longitudine")
         
         dispositivi_formattati = formatta_dispositivi_investigatore(state["dispositivi_attivi"], lat_evento, lon_evento)
 
         print(f"\n[DEBUG INVESTIGATORE] Dispositivi attivi passati all'LLM: {state['dispositivi_attivi']}")
 
-        stato_globale = gestore_registro.r.get(f"smartcity:stato_emergenza:{state['zona']}") or "NORMALE"
+        stato_globale = gestore_registro.r.get(f"smartcity:stato_emergenza:{epicentro_id}") or "NORMALE"
         print(f"[DEBUG INVESTIGATORE] Lo stato globale attuale della zona è: {stato_globale}")
 
         risposta_grezza = (prompt | llm).invoke({
-            "nome_zona": state["zona"],
+            "coordinate_epicentro": f"{lat_evento}, {lon_evento}",
             "stato_globale": stato_globale,
             "contesto_eventi": json.dumps(state["contesto_eventi"], ensure_ascii=False),
             "dispositivi_attivi": "\n".join(dispositivi_formattati) if dispositivi_formattati else "Nessun dispositivo."
@@ -107,8 +108,17 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
 
             # Controllo Cessato Allarme Autonomo
             if risultato.get("stato_zona") == "NORMALE" and stato_globale == "CRITICO":
-                gestore_registro.r.set(f"smartcity:stato_emergenza:{state['zona']}", "NORMALE")
-                print(f"\n[STATE MACHINE] L'IA ha decretato il CESSATO ALLARME! La zona {state['zona']} è di nuovo sicura.")
+                gestore_registro.r.set(f"smartcity:stato_emergenza:{epicentro_id}", "NORMALE")
+                print(f"\n[STATE MACHINE] L'IA ha decretato il CESSATO ALLARME! La zona {epicentro_id} è di nuovo sicura.")
+
+            stato_valutato = risultato.get("stato_zona", "NORMALE")
+            payload_mappa = {
+                "epicentro_id": epicentro_id, 
+                "lat": lat_evento, 
+                "lon": lon_evento, 
+                "stato": stato_valutato
+            }
+            client_pub.publish(f"smartcity/mappa/{epicentro_id}", json.dumps(payload_mappa))
 
             state["analisi_json"] = risultato
             state["errore_parsing"] = None
@@ -128,7 +138,7 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
 
 
 def nodo_correttore(state: SmartCityState) -> SmartCityState:
-    print(f"\n[NODO CORRETTORE] Tento di riparare la formattazione per la zona: {state['zona']}")
+    print(f"\n[NODO CORRETTORE] Tento di riparare la formattazione per la zona: {state['epicentro_id']}")
     
     
     prompt_corr = PromptTemplate(template=TEMPLATE_CORRETTORE, input_variables=["errore", "testo_raw"])
@@ -160,7 +170,7 @@ def nodo_correttore(state: SmartCityState) -> SmartCityState:
 
 def nodo_router(state: SmartCityState) -> SmartCityState:
     print(f"\n[NODO 2: ROUTER] Ricerca dati supplementari in corso...")
-    zona = state["zona"]
+    zona = state["epicentro_id"]
     analisi = state.get("analisi_json") or {}
     
     dispositivi_richiesti = analisi.get("id_dispositivi_richiesti", [])
@@ -253,12 +263,13 @@ def nodo_comandante(evento):
     Legge il report, valuta le risorse IoT disponibili e decide l'intervento tattico.
     Se non c'è reale pericolo, annulla l'emergenza per non sprecare risorse.
     """
-    zona = evento.get("zona", "Sconosciuta")
+    epicentro_id = evento.get("epicentro_id", "Sconosciuto")
+    lat_esatta = evento.get("lat_epicentro")
+    lon_esatta = evento.get("lon_epicentro")
     contesto_eventi = evento.get("contesto_eventi", [])
     analisi = evento.get("analisi_json", {})
     dispositivi_attivi = evento.get("dispositivi_attivi", [])
     
-    lat_esatta, lon_esatta = None, None
     for ev in contesto_eventi:
         if "analisi_telecamera_vlm" in ev and ev.get("posizione") and ev["posizione"].get("coordinate"):
             lat_esatta = ev["posizione"]["coordinate"].get("latitudine")
@@ -273,15 +284,15 @@ def nodo_comandante(evento):
     coordinate_str = f"Latitudine: {lat_esatta}, Longitudine: {lon_esatta}" if lat_esatta else "Non specificate"
     dispositivi_trigger = list(set([ev.get("id_dispositivo") for ev in contesto_eventi if "id_dispositivo" in ev]))
 
-    print(f"\n[NODO 3: COMANDANTE] Valutazione Intervento Strategico per {zona}...")
+    print(f"\n[NODO 3: COMANDANTE] Valutazione Intervento Strategico per {epicentro_id}...")
     
     dispositivi_str = ordina_e_taglia_dispositivi_comandante(dispositivi_attivi, lat_esatta, lon_esatta)
 
     prompt_comandante = get_prompt_comandante(
-        zona=zona,
-        coordinate_str=coordinate_str,
+        epicentro_id=epicentro_id,
+        coordinate_str=f"Lat: {lat_esatta}, Lon: {lon_esatta}",
         dispositivi_trigger=dispositivi_trigger,
-        motivazione_analisi=analisi.get('motivazione_analisi', 'Nessuna descrizione'),
+        motivazione_analisi=analisi.get('motivazione_analisi', ''),
         pericoli_rilevati=analisi.get('pericoli_rilevati', []),
         dispositivi_str=dispositivi_str,
         lat_esatta=lat_esatta,
@@ -336,7 +347,7 @@ def nodo_comandante(evento):
                 payload_cmd = {
                     "comando": "DISPIEGAMENTO_TATTICO",
                     "ordine_operativo": decisione.get("ordine_operativo", ""),
-                    "zona_target": zona
+                    "zona_target": epicentro_id
                 }
                 
                 if is_mobile and lat_esatta is not None and lon_esatta is not None:
@@ -350,11 +361,19 @@ def nodo_comandante(evento):
                 client_pub.publish(topic_cmd, json.dumps(payload_cmd))
                 print(f"[MQTT] Ordine operativo inviato al dispositivo: {id_pulito}")
         
-        stato_attuale_zona = r.get(f"smartcity:stato_emergenza:{zona}")
+        stato_attuale_zona = r.get(f"smartcity:stato_emergenza:{epicentro_id}")
         if stato_attuale_zona != "CRITICO":
-            r.set(f"smartcity:stato_emergenza:{zona}", "CRITICO")
-            print(f"[STATE MACHINE] Stato della zona {zona} bloccato su CRITICO. L'IA monitorerà il rientro dell'emergenza.")
+            r.set(f"smartcity:stato_emergenza:{epicentro_id}", "CRITICO")
+            print(f"[STATE MACHINE] Stato della zona {epicentro_id} bloccato su CRITICO. L'IA monitorerà il rientro dell'emergenza.")
 
+        payload_mappa = {
+            "epicentro_id": epicentro_id, 
+            "lat": lat_esatta, 
+            "lon": lon_esatta, 
+            "stato": "CRITICO"
+        }
+        client_pub.publish(f"smartcity/mappa/{epicentro_id}", json.dumps(payload_mappa))
+        
     except Exception as e:
         print(f"[COMANDANTE] Errore critico di dispiegamento: {e}")
         evento["ordine_comandante"] = {"errore": "Impossibile generare l'ordine"}
@@ -455,21 +474,21 @@ executor = ThreadPoolExecutor(max_workers=NUMERO_WORKER_PARALLELI)
 
 def esegui_grafo(stato_iniziale):
     """Funzione eseguita dal singolo worker nel suo thread separato"""
-    zona = stato_iniziale.get('zona', 'Sconosciuta')
-    print(f"\n[AI CORE] Inizio elaborazione evento per {zona}...")
+    epicentro_id = stato_iniziale.get('epicentro_id', 'Sconosciuto')
+    print(f"\n[AI CORE] Inizio elaborazione evento per {epicentro_id}...")
     
     try:
         app_smart_city.invoke(stato_iniziale)
     except Exception as e:
         print(f"[ERRORE AI CORE] Crash durante l'esecuzione del grafo: {e}")
     finally:
-        buffer_key = f"smartcity:buffer_eventi:{zona}"
-        lock_key = f"lock_analisi:{zona}"
+        buffer_key = f"smartcity:buffer_eventi:{epicentro_id}"
+        lock_key = f"lock_analisi:{epicentro_id}"
         
         eventi_in_buffer = r.lrange(buffer_key, 0, -1)
         
         if eventi_in_buffer:
-            print(f"\n[AI CORE] Trovati {len(eventi_in_buffer)} nuovi eventi nel buffer per {zona}!")
+            print(f"\n[AI CORE] Trovati {len(eventi_in_buffer)} nuovi eventi nel buffer per {epicentro_id}!")
             print(f"[AI CORE] Riavvio immediato dell'analisi per processare i nuovi dati critici.")
             
             r.delete(buffer_key)
@@ -482,7 +501,7 @@ def esegui_grafo(stato_iniziale):
         else:
 
             r.delete(lock_key)
-            print(f"[AI CORE] Analisi completata. Lock rilasciato per {zona}.")
+            print(f"[AI CORE] Analisi completata. Lock rilasciato per {epicentro_id}.")
 
 print("\nAvvio AI Orchestrator (LangGraph + Llama 3.2)...")
 print(f"In ascolto continuo sulla coda Redis 'smartcity:coda_lavori' con {NUMERO_WORKER_PARALLELI} worker...")
