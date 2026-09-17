@@ -36,11 +36,8 @@ class MemoriaSpazioTemporale:
             epicentro_id = epicentri_vicini[0]
         else:
             epicentro_id = f"epi_{int(ts_evento)}_{id_disp}"
-            try:
-                self.r.geoadd("smartcity:epicentri:geo", mapping={epicentro_id: (lon, lat)})
-            except TypeError:
-                self.r.geoadd("smartcity:epicentri:geo", lon, lat, epicentro_id)
-
+            self.r.geoadd("smartcity:epicentri:geo", (lon, lat, epicentro_id))
+        
         chiave_redis = f"smartcity:memory:{epicentro_id}"
         valore_stringa = json.dumps(payload_json)
         
