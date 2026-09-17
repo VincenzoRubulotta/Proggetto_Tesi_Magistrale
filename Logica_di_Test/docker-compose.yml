@@ -78,6 +78,7 @@ services:
       - SPECIALIZATIONS=ricerca_visiva,telecamera
       - LATITUDE=37.516244
       - LONGITUDE=15.092584
+      - PATROL_ROUTE=37.5025,15.0873;37.5098,15.0831;37.5145,15.0927;37.5065,15.0988
     networks:
       - smartcity_net
 
@@ -97,6 +98,7 @@ services:
       - SPECIALIZATIONS=spegnimento_incendi,pompa_acqua
       - LATITUDE=37.5135 
       - LONGITUDE=15.0910
+      - PATROL_ROUTE=37.5186,15.0688;37.5135,15.0910;37.5150,15.1080;37.5278,15.1158
     networks:
       - smartcity_net
 
@@ -116,5 +118,6 @@ services:
       - SPECIALIZATIONS=spegnimento_incendi,schiuma_ritardante
       - LATITUDE=37.5180 
       - LONGITUDE=15.0990
+      - PATROL_ROUTE=37.5218,15.0838;37.5160,15.1010;37.5140,15.0920;37.4990,15.0840
     networks:
       - smartcity_net

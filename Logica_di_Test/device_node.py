@@ -22,6 +22,14 @@ LON = float(os.getenv("LONGITUDE", "15.089"))
 spec_env = os.getenv("SPECIALIZATIONS", "")
 SPECIALIZZAZIONI = [s.strip() for s in spec_env.split(",") if s.strip()]
 
+route_env = os.getenv("PATROL_ROUTE", "")
+PATROL_ROUTE = []
+if route_env:
+    for pt in route_env.split(";"):
+        if "," in pt:
+            la, lo = pt.split(",")
+            PATROL_ROUTE.append((float(la.strip()), float(lo.strip())))
+
 def log_to_dashboard(client, messaggio):
     print(messaggio)
     if client:
@@ -37,9 +45,15 @@ class DispositivoNodo:
         self.lat = LAT
         self.lon = LON
         self.in_movimento = False
+        self.route = PATROL_ROUTE
+        self.route_idx = 0
+        self.occupato_fino_al = 0
 
     def avvia_heartbeat(self, client):
         threading.Thread(target=self._loop_heartbeat, args=(client,), daemon=True).start()
+
+        if IS_MOBILE and self.route:
+            threading.Thread(target=self._loop_pattugliamento, args=(client,), daemon=True).start()
 
     def _loop_heartbeat(self, client):
         topic = f"smartcity/heartbeat/{ZONA}/{TIPO}"
@@ -60,7 +74,20 @@ class DispositivoNodo:
             client.publish(topic, json.dumps(payload))
             time.sleep(3)
 
+    def _loop_pattugliamento(self, client):
+        while True:
+            time.sleep(60)  
+            
+            if time.time() > self.occupato_fino_al and not self.in_movimento:
+                self.route_idx = (self.route_idx + 1) % len(self.route)
+                nuova_lat, nuova_lon = self.route[self.route_idx]
+                
+                self.lat = nuova_lat
+                self.lon = nuova_lon
+                log_to_dashboard(client, f"[{DEVICE_ID}] Pattugliamento: spostato in zona ({self.lat}, {self.lon})")
+
     def esegui_spostamento(self, client, target_lat, target_lon):
+        self.occupato_fino_al = time.time() + 180
         log_to_dashboard(client, f"[{DEVICE_ID}] Inizio volo verso {target_lat}, {target_lon}...")
         self.in_movimento = True
         passi = 5

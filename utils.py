@@ -63,7 +63,7 @@ def formatta_dispositivi_investigatore(dispositivi_attivi, lat_evento, lon_event
             
     return dispositivi_formattati
 
-def ordina_e_taglia_dispositivi_comandante(dispositivi_attivi, lat_esatta, lon_esatta, max_items=4):
+def ordina_e_taglia_dispositivi_comandante(dispositivi_attivi, lat_esatta, lon_esatta, max_items=None):
     """Calcola distanze, ordina l'array e restituisce i Top N in formato JSON."""
     dispositivi_formattati = []
     for disp in dispositivi_attivi:
@@ -95,4 +95,8 @@ def ordina_e_taglia_dispositivi_comandante(dispositivi_attivi, lat_esatta, lon_e
             dispositivi_formattati.append(info_dict)
 
     dispositivi_ordinati = sorted(dispositivi_formattati, key=lambda x: x['DISTANZA_METRI'])
+
+    if max_items is None:
+        return json.dumps(dispositivi_ordinati, indent=2)
+    
     return json.dumps(dispositivi_ordinati[:max_items], indent=2)
