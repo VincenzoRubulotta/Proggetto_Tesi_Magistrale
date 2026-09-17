@@ -98,11 +98,21 @@ class DispositivoNodo:
         log_to_dashboard(client, f"[{DEVICE_ID}] Arrivato a destinazione!")
         self.in_movimento = False
 
-    def invia_simulazione(self, client, scenario="CRITICO"):
+    def invia_simulazione(self, client, scenario="RANDOM", file_scelto= None):
         """Invia dati deterministici basati sullo scenario scelto (CRITICO o NORMALE)"""
         if TIPO in ["telecamera", "drone"]:
+
+            if scenario == "RANDOM":
+                scenario = random.choice(["CRITICO", "NORMALE"])
+
+
             cartella = os.path.join(BASE_POOL, "Telecamere", scenario)
-            file_scelto = random.choice(os.listdir(cartella)) if os.path.exists(cartella) and os.listdir(cartella) else None
+
+            if not file_scelto:
+                if os.path.exists(cartella) and os.listdir(cartella):
+                    file_scelto = random.choice(os.listdir(cartella))
+                else:
+                    file_scelto = None
             
             if file_scelto:
                 try:
@@ -168,7 +178,7 @@ class DispositivoNodo:
             
         if comando == "RICHIEDI_DATO_EMERGENZA":
             log_to_dashboard(client, f"[{DEVICE_ID}] Orchestratore richiede verifica. Invio conferma emergenza...")
-            self.invia_simulazione(client, scenario="CRITICO")
+            self.invia_simulazione(client, scenario="RANDOM")
 
         elif comando == "DISPIEGAMENTO_TATTICO":
             log_to_dashboard(client, f"[{DEVICE_ID}] Ordine Tattico dal Comandante: {payload.get('ordine_operativo')}")
@@ -199,16 +209,34 @@ try:
         print(f"\n=== CONTROLLO MANUALE ({DEVICE_ID}) ===")
 
         if TIPO in ["telecamera", "drone"]:
-            print("1 - INNESCA EMERGENZA (Invia foto critica)")
-            print("2 - CESSATO ALLARME (Invia foto di normalità)")
+            print("1 - INNESCA EMERGENZA (Scegli foto critica)")
+            print("2 - CESSATO ALLARME (Scegli foto di normalità)")
             scelta = input("Seleziona lo scenario (1 o 2): ").strip()
             
-            if scelta == '1':
-                log_to_dashboard(client, f"[{DEVICE_ID}] Lancio scenario CRITICO...")
-                nodo.invia_simulazione(client, scenario="CRITICO")
-            elif scelta == '2':
-                log_to_dashboard(client, f"[{DEVICE_ID}] Lancio scenario NORMALE...")
-                nodo.invia_simulazione(client, scenario="NORMALE")
+            scenario_scelto = "CRITICO" if scelta == '1' else "NORMALE" if scelta == '2' else None
+
+            if scenario_scelto:
+                cartella = os.path.join(BASE_POOL, "Telecamere", scenario_scelto)
+                if os.path.exists(cartella):
+                    files = [f for f in os.listdir(cartella) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+                    
+                    if files:
+                        print(f"\n--- Immagini in {scenario_scelto} ---")
+                        for i, f in enumerate(files):
+                            print(f"[{i}] {f}")
+                        
+                        idx = input("\nDigita il numero dell'immagine da inviare: ").strip()
+                        
+                        if idx.isdigit() and 0 <= int(idx) < len(files):
+                            foto_scelta = files[int(idx)]
+                            log_to_dashboard(client, f"[{DEVICE_ID}] Invio manuale di {foto_scelta}...")
+                            nodo.invia_simulazione(client, scenario=scenario_scelto, file_scelto=foto_scelta)
+                        else:
+                            print("Selezione non valida. Operazione annullata.")
+                    else:
+                        print(f"ATTENZIONE: La cartella {cartella} è vuota!")
+                else:
+                    print(f"Cartella {cartella} non trovata. Creala inserendo alcune immagini.")
             else:
                 print("Scelta non valida. Premi 1 o 2.")
 

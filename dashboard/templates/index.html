@@ -12,8 +12,21 @@
         .logs-section { height: 45vh; overflow-x: auto; white-space: nowrap; display: flex; padding: 10px; gap: 10px; }
         .device-col { background: #1e1e1e; border: 1px solid #333; min-width: 300px; max-width: 300px; display: flex; flex-direction: column; border-radius: 8px; }
         .device-header { background: #0d6efd; color: white; padding: 8px; text-align: center; font-weight: bold; border-top-left-radius: 8px; border-top-right-radius: 8px; }
-        .terminal { flex-grow: 1; padding: 10px; overflow-y: auto; font-family: monospace; font-size: 12px; color: #0f0; background: #000; }
+        .terminal { flex-grow: 1; padding: 10px; overflow-y: auto; font-family: monospace; font-size: 12px; background: #000; }
         #map { height: 50vh; width: 100%; border-top: 4px solid #0d6efd; }
+
+        .custom-map-marker {
+            background-color: #2b2b2b; 
+            border: 3px solid #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+        }
+        .marker-mobile { border-color: #dc3545; } /* Bordo rosso per i droni */
+        .marker-fixed { border-color: #0d6efd; } /* Bordo blu per i sensori fissi */
     </style>
 </head>
 <body>
@@ -53,7 +66,19 @@
             }
 
             let terminal = document.getElementById(termId);
-            terminal.innerHTML += `<div>[${data.timestamp}] ${data.messaggio}</div>`;
+            
+            let logColor = "#0f0"; // Verde di default
+            let msgUpper = data.messaggio.toUpperCase();
+            
+            if (msgUpper.includes("CRITICO") || msgUpper.includes("EMERGENZA") || msgUpper.includes("BOATO")) {
+                logColor = "#ff4c4c"; // Rosso
+            } else if (msgUpper.includes("ANOMALIA") || msgUpper.includes("RICHIEDE VERIFICA")) {
+                logColor = "#ffcc00"; // Giallo
+            } else if (msgUpper.includes("CESSATO ALLARME") || msgUpper.includes("NORMALE")) {
+                logColor = "#00d2ff"; // Azzurro
+            }
+
+            terminal.innerHTML += `<div style="color: ${logColor};">[${data.timestamp}] ${data.messaggio}</div>`;
             terminal.scrollTop = terminal.scrollHeight;
         });
 
@@ -78,27 +103,35 @@
             if (markers[deviceId]) {
                 markers[deviceId].setLatLng([lat, lon]);
             } else {
-                let iconColor = data.is_mobile ? 'red' : 'blue';
-                
-                let markerIcon = new L.Icon({
-                    iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${iconColor}.png`,
-                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41],
-                    popupAnchor: [1, -34],
-                    shadowSize: [41, 41]
+                let iconEmoji = "📍";
+                switch(data.tipo_dispositivo) {
+                    case 'drone': iconEmoji = "🚁"; break;
+                    case 'telecamera': iconEmoji = "📹"; break;
+                    case 'microfono': iconEmoji = "🎙️"; break;
+                    case 'sensore_temperatura': iconEmoji = "🌡️"; break;
+                }
+
+                let borderClass = data.is_mobile ? 'marker-mobile' : 'marker-fixed';
+
+                let customIcon = L.divIcon({
+                    html: `<div class="custom-map-marker ${borderClass}" style="width: 36px; height: 36px;">${iconEmoji}</div>`,
+                    className: '', 
+                    iconSize: [36, 36],
+                    iconAnchor: [18, 18],
+                    popupAnchor: [0, -20]
                 });
 
-                let marker = L.marker([lat, lon], {icon: markerIcon}).addTo(map);
+                let marker = L.marker([lat, lon], {icon: customIcon}).addTo(map);
+                
                 let powerText = (data.is_mobile && data.batteria !== undefined && data.batteria !== "N/D") 
-                    ? `<br>Batteria: ${data.batteria}%` 
-                    : `<br>Rete Elettrica`;
+                    ? `<br>🔋 Batteria: ${data.batteria}%` 
+                    : `<br>🔌 Rete Elettrica`;
 
                 let specText = (data.specializzazioni && data.specializzazioni.length > 0) 
-                    ? `<br>Spec: ${data.specializzazioni.join(', ').replace(/_/g, ' ')}` 
+                    ? `<br>🛠 Spec: ${data.specializzazioni.join(', ').replace(/_/g, ' ')}` 
                     : '';
 
-                marker.bindPopup(`<b>${deviceId}</b><br>Tipo: ${data.tipo_dispositivo.replace(/_/g, ' ')}${powerText}${specText}`);
+                marker.bindPopup(`<b>${deviceId}</b><br>🏷 Tipo: ${data.tipo_dispositivo.replace(/_/g, ' ')}${powerText}${specText}`);
                 markers[deviceId] = marker;
             }
         });
