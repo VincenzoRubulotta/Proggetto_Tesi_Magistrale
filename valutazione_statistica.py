@@ -36,7 +36,7 @@ disp_attivi_com = """
 """
 
 # ==========================================
-# GOLDEN DATASET (I 7 SCENARI DINAMICI)
+# GOLDEN DATASET (I 9 SCENARI DINAMICI)
 # ==========================================
 scenari = [
     {
@@ -119,6 +119,34 @@ scenari = [
         "mock_inv_motivazione": "Allarme termico confermato visivamente: incendio di un'auto e cassonetto in corso.",
         "mock_inv_pericoli": ["incendio", "fuoco auto"],
         "atteso_com_drone": "DRONE_02"
+    },
+    {
+        "nome": "SCENARIO 8: Escalation Reale (Mic Boato -> Cam Incendio)",
+        "coord": "37.514077, 15.092305",
+        "contesto": json.dumps([
+            {"id_dispositivo": "MIC_EST", "dato_rilevato": {"allarme": "boato_rilevato", "trascrizione_audio": "Forte boato e rumori metallici."}},
+            {"id_dispositivo": "CAM_NORD", "analisi_telecamera_vlm": "A large explosion has occurred at a street food stand. Fire is spreading rapidly and thick black smoke is visible."}
+        ]),
+        "atteso_inv_stato": "CRITICO",
+        "atteso_inv_richiesta": "NESSUNO",
+        "testa_comandante": True,
+        "mock_inv_motivazione": "Il boato è stato confermato dalla telecamera: esplosione e incendio in corso.",
+        "mock_inv_pericoli": ["incendio", "esplosione"],
+        "atteso_com_drone": "DRONE_02"
+    },
+    {
+        "nome": "SCENARIO 9: Escalation Reale (Mic Boato -> Cam Incidente Stradale)",
+        "coord": "37.514077, 15.092305",
+        "contesto": json.dumps([
+            {"id_dispositivo": "MIC_EST", "dato_rilevato": {"allarme": "boato_rilevato", "trascrizione_audio": "Forte boato e rumori metallici prolungati."}},
+            {"id_dispositivo": "CAM_NORD", "analisi_telecamera_vlm": "Two vehicles have crashed violently into a lamppost. Debris is scattered across the road, and traffic is completely blocked."}
+        ]),
+        "atteso_inv_stato": "CRITICO",
+        "atteso_inv_richiesta": "NESSUNO",
+        "testa_comandante": True,
+        "mock_inv_motivazione": "Il rumore metallico è stato confermato: grave incidente stradale con detriti sulla carreggiata.",
+        "mock_inv_pericoli": ["incidente stradale", "detriti", "traffico bloccato"],
+        "atteso_com_drone": "DRONE_01"
     }
 ]
 
