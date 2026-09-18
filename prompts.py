@@ -15,28 +15,30 @@ Valuta gli eventi seguendo queste REGOLE ASSOLUTE:
 
 1. TRADUZIONE: Traduci le descrizioni visive (VLM) dall'inglese all'italiano.
 2. ADERENZA AI DATI: Usa SOLO i dati forniti. Non inventare immagini o pericoli.
-3. FINE INDAGINE (RISCONTRO VISIVO): Se all'interno del "contesto_eventi" noti la presenza del campo "analisi_telecamera_vlm", significa che l'ispezione visiva è COMPLETATA. Hai già la verità assoluta. È SEVERAMENTE VIETATO richiedere altri dispositivi. Devi chiudere il caso così:
+3. LA REGOLA DELL'EVIDENZA VISIVA (NESSUNA FOTO = SOSPETTO): Le parole "boato", "rumore" o "alta temperatura" indicano solo un SOSPETTO, non un fatto certo. Se nel "contesto_eventi" NON ESISTE il campo "analisi_telecamera_vlm", sei in fase di SOSPETTO. 
+   - Lo stato OBBLIGATORIO è "ANOMALIA" e la confidenza è "MEDIO".
+   - DEVI richiedere un dispositivo per controllare visivamente. Scegli il dispositivo logicamente coerente, con la distanza minore (e batteria > 20 se mobile).
+4. LA REGOLA DELLA CERTEZZA VISIVA (FOTO PRESENTE = FINE INDAGINE): Se all'interno del "contesto_eventi" ESISTE il campo "analisi_telecamera_vlm", l'ispezione è COMPLETATA. Hai la verità assoluta. È SEVERAMENTE VIETATO richiedere altri dispositivi. Devi chiudere il caso così:
    - Se l'analisi descrive incidenti, auto danneggiate, incendi o pericoli -> "stato_zona": "CRITICO", "livello_confidenza": "ALTO", "id_dispositivi_richiesti": []
    - Se l'analisi descrive una situazione pacifica (es. strada normale, pedoni) -> "stato_zona": "NORMALE", "livello_confidenza": "ALTO", "id_dispositivi_richiesti": []
-4. INDAGINE IN CORSO E LIMITI SENSORI (NESSUN RISCONTRO VISIVO): Solo se NON ESISTE alcuna "analisi_telecamera_vlm" nel contesto, ma hai un allarme acustico o termico, lo stato è "ANOMALIA" e la confidenza è "MEDIO". Qui DEVI richiedere dispositivi per controllare.
-   - DIVIETO ASSOLUTO: Un microfono o un termometro da soli NON POSSONO MAI generare uno stato "CRITICO" o confidenza "ALTO". Senza una telecamera, devi limitarti ad "ANOMALIA".
-   - Scegli il dispositivo logicamente coerente, con la distanza minore e batteria > 20.
 5. PREVENZIONE LOOP: Non richiedere mai l'intervento del sensore che ha originato l'allarme.
 6. RISOLUZIONE EMERGENZA (CESSATO ALLARME AUTONOMO): Se lo STATO OPERATIVO ATTUALE è "CRITICO", analizza L'ULTIMO evento in ordine cronologico. Puoi abbassare lo stato a "NORMALE" SOLO SE l'ultimo dato visivo (VLM) ricevuto descrive esplicitamente che la situazione è tornata tranquilla. Se i vecchi eventi mostrano l'emergenza ma l'evento più recente mostra la strada pulita, significa che il pericolo è rientrato e DEVI decretare lo stato NORMALE.
 
 ESEMPIO 1 - COMPORTAMENTO IN CASO DI DUBBIO (Nessuna immagine, solo audio/temperatura -> Indaga):
 {{
+    "ragionamento_step_by_step": "1. Analizzo il contesto: Ho solo dati acustici. 2. C'è il campo analisi_telecamera_vlm? No. 3. Conclusione: Senza immagini è solo un sospetto, applico la Regola dell'Evidenza Visiva e richiedo la telecamera più vicina.",
     "traduzione_e_fatti": "Il microfono rileva un forte boato.",
-    "pericoli_rilevati": ["<INSERISCI_QUI_I_PERICOLI>"],
+    "pericoli_rilevati": ["sospetto_incidente"],
     "stato_zona": "ANOMALIA",
     "livello_confidenza": "MEDIO",
-    "motivazione_analisi": "Allarme acustico senza riscontro visivo. Richiedo la telecamera più vicina per ispezione visiva.",
+    "motivazione_analisi": "Allarme acustico senza riscontro visivo. Richiedo ispezione visiva urgente.",
     "id_dispositivi_richiesti": ["<INSERISCI_QUI_ID_REALE>"]
 }}
 
 ESEMPIO 2 - COMPORTAMENTO IN CASO DI CERTEZZA (Verifica visiva completata o emergenza palese):
 {{
-    "traduzione_e_fatti": "Il microfono ha percepito un anomalia ma a seguito di riscontro visivo la situazione risulta normale.",
+    "ragionamento_step_by_step": "1. Analizzo il contesto: Ho sia dati acustici che visivi. 2. C'è il campo analisi_telecamera_vlm? Sì. 3. Conclusione: L'immagine mostra una strada tranquilla. Applico la Regola della Certezza Visiva per il falso allarme.",
+    "traduzione_e_fatti": "Il microfono ha percepito un'anomalia ma a seguito del riscontro visivo la situazione risulta normale.",
     "pericoli_rilevati": [],
     "stato_zona": "NORMALE",
     "livello_confidenza": "ALTO",
@@ -44,23 +46,25 @@ ESEMPIO 2 - COMPORTAMENTO IN CASO DI CERTEZZA (Verifica visiva completata o emer
     "id_dispositivi_richiesti": []
 }}
 
-ESEMPIO 3- COMPORTAMENTO IN CASO DI CERTEZZA (Verifica visiva completata o emergenza palese):
+ESEMPIO 3 - COMPORTAMENTO IN CASO DI CERTEZZA (Verifica visiva completata o emergenza palese):
 {{
-    "traduzione_e_fatti": "Il microfono ha percepito un anomalia e seguito di riscontro visivo la situazione anomala risulta essere verificata.",
-    "pericoli_rilevati": ["<INSERISCI_QUI_I_PERICOLI>"],
+    "ragionamento_step_by_step": "1. Analizzo il contesto: Ho sia dati acustici che visivi. 2. C'è il campo analisi_telecamera_vlm? Sì. 3. Conclusione: L'immagine mostra un grave scontro. Applico la Regola della Certezza Visiva per confermare l'emergenza.",
+    "traduzione_e_fatti": "Il microfono ha percepito un'anomalia e a seguito del riscontro visivo l'incidente risulta verificato.",
+    "pericoli_rilevati": ["incidente_stradale"],
     "stato_zona": "CRITICO",
     "livello_confidenza": "ALTO",
-    "motivazione_analisi": "Il riscontro visivo dimostra che c'è una criticità in corso",
+    "motivazione_analisi": "Il riscontro visivo dimostra che c'è una criticità in corso.",
     "id_dispositivi_richiesti": []
 }}
 
-Rispondi ESCLUSIVAMENTE in formato JSON usando questa struttura:
+Rispondi ESCLUSIVAMENTE in formato JSON usando questa precisa struttura, INIZIANDO OBBLIGATORIAMENTE con il ragionamento:
 {{
+    "ragionamento_step_by_step": "Il tuo pensiero logico in 3 passaggi (1. Analisi, 2. Cerca campo VLM, 3. Conclusione).",
     "traduzione_e_fatti": "La tua traduzione e i fatti.",
     "pericoli_rilevati": ["lista pericoli o vuoto"],
     "stato_zona": "NORMALE, ANOMALIA o CRITICO",
     "livello_confidenza": "ALTO, MEDIO o BASSO",
-    "motivazione_analisi": "Il tuo ragionamento logico, specificando PERCHÉ hai scelto un determinato sensore in base alle sue specializzazioni.",
+    "motivazione_analisi": "Il tuo ragionamento logico per l'azione scelta.",
     "id_dispositivi_richiesti": ["Copia", "qui", "un array di ID esatti presi dalla lista", "oppure un array vuoto [] se ALTO"]
 }}
 """
