@@ -14,15 +14,13 @@ IL TUO OBIETTIVO LOGICO:
 Valuta gli eventi seguendo queste REGOLE ASSOLUTE:
 
 1. TRADUZIONE: Traduci le descrizioni visive (VLM) dall'inglese all'italiano.
-2. ADERENZA AI DATI: Usa SOLO i dati forniti. Non inventare immagini, pericoli o dispositivi inesistenti.
-3. RISCONTRO VISIVO (PRIORITÀ ASSOLUTA): Se nel contesto è presente l'analisi di una telecamera o di un drone (VLM), essa ha SEMPRE l'ultima parola sull'audio o sulla temperatura. Leggi attentamente la descrizione visiva e applica rigorosamente QUESTO BIVIO LOGICO:
-   - CASO A (EMERGENZA CONFERMATA): Se il VLM descrive auto danneggiate ("accident", "damaged cars", "crash"), incendi, o pericoli in corso, DEVI impostare lo stato su "CRITICO", confidenza "ALTO" e id_dispositivi_richiesti su [].
-   - CASO B (FALSO ALLARME): Se il VLM descrive esplicitamente una situazione pacifica ("no hazards", "pedestrians walking", "normal"), DEVI impostare lo stato su "NORMALE", confidenza "ALTO" e id_dispositivi_richiesti su [].
-4. INCERTEZZA E INDAGINE (MEDIO/BASSO): Se c'è un allarme da un sensore acustico o termico ma MANCA un riscontro visivo (VLM), lo stato è ANOMALIA e la confidenza è MEDIO. In questo caso, DEVI richiedere l'intervento di uno o più dispositivi dalla lista per un controllo supplementare. Scegli valutando:
-   - COERENZA DELLE SPECIALIZZAZIONI: seleziona dispositivi le cui capacità siano logicamente utili per indagare il tipo specifico di anomalia rilevata.
-   - DISTANZA: a parità di utilità, preferisci SEMPRE i dispositivi più vicini all'evento.
-   - MOBILITÀ E BATTERIA: se scegli un dispositivo mobile ("IS_MOBILE": true) per l'ispezione, la sua batteria deve essere > 20.
-5. PREVENZIONE LOOP: Non richiedere MAI l'intervento di un dispositivo il cui ID è già presente nel "contesto_eventi" come fonte dell'allarme. Non richiedere MAI l'intervento di un dispositivo se ha GIA' inviato un dato visivo recente presente nel contesto_eventi.
+2. ADERENZA AI DATI: Usa SOLO i dati forniti. Non inventare immagini o pericoli.
+3. FINE INDAGINE (RISCONTRO VISIVO): Se all'interno del "contesto_eventi" noti la presenza del campo "analisi_telecamera_vlm", significa che l'ispezione visiva è COMPLETATA. Hai già la verità assoluta. È SEVERAMENTE VIETATO richiedere altri dispositivi. Devi chiudere il caso così:
+   - Se l'analisi descrive incidenti, auto danneggiate, incendi o pericoli -> "stato_zona": "CRITICO", "livello_confidenza": "ALTO", "id_dispositivi_richiesti": []
+   - Se l'analisi descrive una situazione pacifica (es. strada normale, pedoni) -> "stato_zona": "NORMALE", "livello_confidenza": "ALTO", "id_dispositivi_richiesti": []
+4. INDAGINE IN CORSO (NESSUN RISCONTRO VISIVO): Solo se NON ESISTE alcuna "analisi_telecamera_vlm" nel contesto, ma hai un allarme acustico o termico, lo stato è "ANOMALIA" e la confidenza è "MEDIO". Qui DEVI richiedere dispositivi per controllare.
+   - Scegli il dispositivo logicamente coerente, con la distanza minore e batteria > 20.
+5. PREVENZIONE LOOP: Non richiedere mai l'intervento del sensore che ha originato l'allarme.
 6. RISOLUZIONE EMERGENZA (CESSATO ALLARME AUTONOMO): Se lo STATO OPERATIVO ATTUALE è "CRITICO", analizza L'ULTIMO evento in ordine cronologico. Puoi abbassare lo stato a "NORMALE" SOLO SE l'ultimo dato visivo (VLM) ricevuto descrive esplicitamente che la situazione è tornata tranquilla. Se i vecchi eventi mostrano l'emergenza ma l'evento più recente mostra la strada pulita, significa che il pericolo è rientrato e DEVI decretare lo stato NORMALE.
 
 ESEMPIO 1 - COMPORTAMENTO IN CASO DI DUBBIO (Nessuna immagine, solo audio/temperatura -> Indaga):
@@ -96,13 +94,13 @@ ARRAY DEI DISPOSITIVI TATTICI ONLINE (Formato JSON):
 {dispositivi_str}
 
 IL TUO OBIETTIVO STRATEGICO E TATTICO:
-1. VALUTAZIONE: Redigi una breve descrizione della situazione.
-2. FORZE UMANE: Scegli chi dispiegare tra ["POLIZIA", "AMBULANZA", "VIGILI_DEL_FUOCO", "PROTEZIONE_CIVILE"] o "NESSUNO" scegliendo quale tra questi servizi di intervento umano sono più appropriati per risolvere e o dare aiuto nella situazione che hai analizzato.
-3. SUPPORTO CYBER-FISICO (IoT): I dispositivi con "IS_MOBILE": false sono INAMOVIBILI. Non puoi calcolare la loro distanza né 'inviarli'. Il tuo compito è valutare SOLO se inviare dispositivi mobili (droni) in supporto, rispettando queste regole:
-   - REGOLA 1 (Coerenza Operativa): Scegli i dispositivi le cui "SPECIALIZZAZIONI" mitigano o analizzano direttamente i "Pericoli Rilevati" (intervento fisico, medico, analitico).
-   - REGOLA 2 (Ottimizzazione Ridondanze): Evita gli sprechi. Se un sensore fisso presente in zona copre già una specifica necessità (es. ispezione visiva o acustica), non dispiegare unità mobili che offrono solo quella stessa capacità.
-   - REGOLA 3 (Logistica delle Distanze): Tra i dispositivi con specializzazioni adatte, seleziona SEMPRE quello con il valore "DISTANZA_METRI" PIÙ BASSO (fai il calcolo matematico per confrontarli).
-   - REGOLA 4 (Sicurezza Energetica): Dispiega dispositivi con "IS_MOBILE": true SOLO SE il loro valore "BATTERIA_PERCENTUALE" è strettamente > 20.
+1. VALUTAZIONE: Redigi una breve descrizione della situazione. DEVI basarti STRETTAMENTE sul "Motivazione e Contesto Visivo" fornito. Non inventare incendi, esplosioni o scenari apocalittici se non sono menzionati esplicitamente.
+2. FORZE UMANE: Scegli chi dispiegare tra ["POLIZIA", "AMBULANZA", "VIGILI_DEL_FUOCO", "PROTEZIONE_CIVILE"] o "NESSUNO" scegliendo quale tra questi servizi di intervento umano sono più appropriati.
+3. SUPPORTO CYBER-FISICO (IoT): I dispositivi con "IS_MOBILE": false sono INAMOVIBILI. Non puoi calcolare la loro distanza né 'inviarli'. Il tuo compito è valutare SOLO se inviare DRONI (dispositivi mobili) in supporto, rispettando queste regole:
+   - REGOLA 1 (Coerenza): Scegli droni le cui "SPECIALIZZAZIONI" siano coerenti con i Pericoli Rilevati. 
+   - REGOLA 2 (Ottimizzazione): Se un sensore fisso copre già una necessità, non dispiegare droni per la stessa capacità.
+   - REGOLA 3 (Distanza): Scegli SEMPRE il drone mobile più vicino ("DISTANZA_METRI" PIÙ BASSO).
+   - REGOLA 4 (Batteria): Scegli droni SOLO SE la loro "BATTERIA_PERCENTUALE" è > 20.
 
 Rispondi ESCLUSIVAMENTE in formato JSON con questa esatta struttura ordinata:
 {{
@@ -114,7 +112,7 @@ Rispondi ESCLUSIVAMENTE in formato JSON con questa esatta struttura ordinata:
         "longitudine": {lon_val}
     }},
     "unita_intervento_umano": ["Elenco forze umane"],
-    "motivazione_tattica_iot": "Spiega la scelta finale basata ESCLUSIVAMENTE sulle specializzazioni, confermando di aver scelto il primo dispositivo utile della lista.",
-    "dispositivi_tattici_attivati": ["Elenco ID dispositivi IoT scelti. Scrivi NESSUNO se non servono"]
+    "motivazione_tattica_iot": "Spiega la scelta finale.",
+    "dispositivi_tattici_attivati": ["Elenco ID. Inserisci SOLO dispositivi con IS_MOBILE: true. Scrivi NESSUNO se non servono"]
 }}
 """
