@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import time
 import queue
@@ -316,7 +317,7 @@ def nodo_comandante(evento):
                 if disp_id.upper() in ["NESSUNO", "NULL", "NONE", ""]:
                     continue
                     
-                id_pulito = disp_id.split(" ")[0].strip()
+                id_pulito = re.sub(r'[^A-Za-z0-9_]', '', str(disp_id).upper())
                 
                 is_mobile = False
                 for d in dispositivi_attivi:

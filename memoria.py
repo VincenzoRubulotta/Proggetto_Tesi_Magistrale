@@ -34,9 +34,15 @@ class MemoriaSpazioTemporale:
             
         if epicentri_vicini:
             epicentro_id = epicentri_vicini[0]
+            pos_epicentro = self.r.geopos("smartcity:epicentri:geo", epicentro_id)
+            if pos_epicentro and pos_epicentro[0]:
+                lon_epi, lat_epi = pos_epicentro[0][0], pos_epicentro[0][1]
+            else:
+                lon_epi, lat_epi = lon, lat
         else:
             epicentro_id = f"epi_{int(ts_evento)}_{id_disp}"
             self.r.geoadd("smartcity:epicentri:geo", (lon, lat, epicentro_id))
+            lon_epi, lat_epi = lon, lat
         
         chiave_redis = f"smartcity:memory:{epicentro_id}"
         valore_stringa = json.dumps(payload_json)
@@ -44,10 +50,9 @@ class MemoriaSpazioTemporale:
         self.r.zadd(chiave_redis, {valore_stringa: ts_evento})
         soglia_vecchiaia = ts_evento - self.finestra_secondi
         self.r.zremrangebyscore(chiave_redis, '-inf', soglia_vecchiaia)
-        
         self.r.expire(chiave_redis, 60 + self.finestra_secondi)
         
         eventi_salvati_stringa = self.r.zrange(chiave_redis, 0, -1)
         storico_recente = [json.loads(evento) for evento in eventi_salvati_stringa]
         
-        return epicentro_id, lat, lon, storico_recente
+        return epicentro_id, lat_epi, lon_epi, storico_recente
