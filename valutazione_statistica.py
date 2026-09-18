@@ -1,21 +1,20 @@
 import json
-import re
+import time
 from collections import Counter
 from langchain_ollama import OllamaLLM
 from langchain_core.prompts import PromptTemplate
 from prompts import TEMPLATE_INVESTIGATORE, get_prompt_comandante
 
-# Inizializziamo il modello (temperatura a 0.4 per un buon bilanciamento tra creatività e coerenza)
+# Inizializzazione (temp 0.4)
 llm = OllamaLLM(model="llama3.2", base_url="http://localhost:11434", format="json", temperature=0.4)
 prompt_inv = PromptTemplate(template=TEMPLATE_INVESTIGATORE, input_variables=["coordinate_epicentro", "contesto_eventi", "dispositivi_attivi"])
 chain_investigatore = prompt_inv | llm
 
-NUM_ITERAZIONI = 10  # Aumenta a 20, 30 o 50 per test accademici
+NUM_ITERAZIONI = 10  # Aumenta a 30 per la tesi
 
 # ==========================================
-# COSTRUZIONE DEL GOLDEN DATASET
+# DISPOSITIVI SIMULATI
 # ==========================================
-
 disp_attivi_inv = """
 - ID: DRONE_02 (Tipo: drone, Mobile: SÌ, Distanza: 132m, Batteria: 85%, Specializzazioni: [spegnimento_incendi, pompa_acqua])
 - ID: MIC_EST (Tipo: microfono, Mobile: NO, Distanza: 0m, Batteria: 100%, Specializzazioni: [sirene, esplosioni, rumori_anomali])
@@ -36,169 +35,223 @@ disp_attivi_com = """
 ]
 """
 
+# ==========================================
+# GOLDEN DATASET (I 7 SCENARI DINAMICI)
+# ==========================================
 scenari = [
     {
-        "nome": "SCENARIO 1: Falso Allarme (Boato ma strada tranquilla)",
+        "nome": "SCENARIO 1: Solo Microfono (Richiesta Ispezione)",
         "coord": "37.514077, 15.092305",
         "contesto": json.dumps([
-            {"id_dispositivo": "MIC_EST", "dato_rilevato": {"allarme": "boato_rilevato", "trascrizione_audio": "Forte boato e rumori metallici."}},
-            {"id_dispositivo": "CAM_NORD", "analisi_telecamera_vlm": "The image depicts an urban street scene with two cars parked on the side of the road and a van driving down the street. A tall building stands prominently in the background, surrounded by trees that provide some shade to the area. There are no visible signs of accidents or hazards, but several pedestrians can be seen walking along the sidewalk near the buildings."}
+            {"id_dispositivo": "MIC_EST", "dato_rilevato": {"allarme": "boato_rilevato", "trascrizione_audio": "Forte boato e rumori metallici."}}
         ]),
-        "atteso_inv_stato": "NORMALE",
-        "mock_inv_motivazione": "Il VLM mostra un cantiere e pedoni tranquilli. Nessun pericolo confermato.",
-        "mock_inv_pericoli": [],
-        "atteso_com_drone": "NESSUNO"
+        "atteso_inv_stato": "ANOMALIA",
+        "atteso_inv_richiesta": "CAM_NORD", 
+        "testa_comandante": False
     },
     {
-        "nome": "SCENARIO 2: Incidente Stradale",
+        "nome": "SCENARIO 2: Solo Sensore Termico (Richiesta Ispezione)",
+        "coord": "37.514206, 15.092822",
+        "contesto": json.dumps([
+            {"id_dispositivo": "TEMP_01", "dato_rilevato": {"allarme": "TEMPERATURA_CRITICA", "temperatura": 85.5}}
+        ]),
+        "atteso_inv_stato": "ANOMALIA",
+        "atteso_inv_richiesta": "CAM_NORD", 
+        "testa_comandante": False
+    },
+    {
+        "nome": "SCENARIO 3: Solo Telecamera (Situazione Normale)",
         "coord": "37.514511, 15.092750",
         "contesto": json.dumps([
-            {"id_dispositivo": "MIC_EST", "dato_rilevato": {"allarme": "boato_rilevato", "trascrizione_audio": "Forte boato e rumori metallici."}},
-            {"id_dispositivo": "CAM_NORD", "analisi_telecamera_vlm": "The image shows two cars involved in an accident on the side of a road. One car is green and appears to be damaged, while the other car is yellow and also seems to have sustained damage. Both cars are parked next to each other, with their front ends facing opposite directions."}
+            {"id_dispositivo": "CAM_NORD", "analisi_telecamera_vlm": "The street is completely normal. Pedestrians are walking and cars are parked properly. No hazards."}
+        ]),
+        "atteso_inv_stato": "NORMALE",
+        "atteso_inv_richiesta": "NESSUNO",
+        "testa_comandante": False
+    },
+    {
+        "nome": "SCENARIO 4: Solo Telecamera (Incendio Diretto)",
+        "coord": "37.514511, 15.092750",
+        "contesto": json.dumps([
+            {"id_dispositivo": "CAM_NORD", "analisi_telecamera_vlm": "A large fire is spreading in a building. Thick black smoke is coming out."}
         ]),
         "atteso_inv_stato": "CRITICO",
-        "mock_inv_motivazione": "Il VLM conferma uno scontro tra due auto con danni visibili.",
-        "mock_inv_pericoli": ["incidente stradale", "auto danneggiate"],
+        "atteso_inv_richiesta": "NESSUNO",
+        "testa_comandante": True,
+        "mock_inv_motivazione": "La telecamera ha innescato direttamente un'emergenza per incendio strutturale.",
+        "mock_inv_pericoli": ["incendio"],
+        "atteso_com_drone": "DRONE_02"
+    },
+    {
+        "nome": "SCENARIO 5: Solo Telecamera (Incidente Diretto)",
+        "coord": "37.514511, 15.092750",
+        "contesto": json.dumps([
+            {"id_dispositivo": "CAM_NORD", "analisi_telecamera_vlm": "Two cars collided at the intersection. Damaged vehicles."}
+        ]),
+        "atteso_inv_stato": "CRITICO",
+        "atteso_inv_richiesta": "NESSUNO",
+        "testa_comandante": True,
+        "mock_inv_motivazione": "Scontro tra veicoli confermato visivamente dalla telecamera.",
+        "mock_inv_pericoli": ["incidente stradale"],
         "atteso_com_drone": "DRONE_01"
     },
     {
-        "nome": "SCENARIO 3: Incendio Grattacielo",
-        "coord": "37.514511, 15.092750",
+        "nome": "SCENARIO 6: Falso Allarme (Mic Boato -> Cam Normale)",
+        "coord": "37.514077, 15.092305",
         "contesto": json.dumps([
-            {"id_dispositivo": "CAM_NORD", "analisi_telecamera_vlm": "The image shows a tall white building with a fire burning on the top floor. Thick black smoke is billowing out of the windows and rising into the sky, indicating that the fire has spread to multiple floors within the structure."}
+            {"id_dispositivo": "MIC_EST", "dato_rilevato": {"allarme": "boato_rilevato"}},
+            {"id_dispositivo": "CAM_NORD", "analisi_telecamera_vlm": "Street is normal, a large truck just dropped a metal container safely. No accidents."}
+        ]),
+        "atteso_inv_stato": "NORMALE",
+        "atteso_inv_richiesta": "NESSUNO",
+        "testa_comandante": False
+    },
+    {
+        "nome": "SCENARIO 7: Escalation Reale (Temp Alta -> Cam Incendio)",
+        "coord": "37.514206, 15.092822",
+        "contesto": json.dumps([
+            {"id_dispositivo": "TEMP_01", "dato_rilevato": {"allarme": "TEMPERATURA_CRITICA", "temperatura": 90.0}},
+            {"id_dispositivo": "CAM_NORD", "analisi_telecamera_vlm": "Fire and smoke visible from the nearby dumpster spreading to a car."}
         ]),
         "atteso_inv_stato": "CRITICO",
-        "mock_inv_motivazione": "Il VLM mostra chiaramente un incendio attivo ai piani alti di un edificio con denso fumo nero.",
-        "mock_inv_pericoli": ["incendio strutturale", "fumo"],
+        "atteso_inv_richiesta": "NESSUNO",
+        "testa_comandante": True,
+        "mock_inv_motivazione": "Allarme termico confermato visivamente: incendio di un'auto e cassonetto in corso.",
+        "mock_inv_pericoli": ["incendio", "fuoco auto"],
         "atteso_com_drone": "DRONE_02"
     }
 ]
 
 # ==========================================
-# VARIABILI STATISTICHE GLOBALI
+# VARIABILI GLOBALI E ESECUZIONE
 # ==========================================
-totale_run = len(scenari) * NUM_ITERAZIONI
-global_inv_successi = 0
-global_inv_errori_json = 0
+global_inv_successi_stato = 0
+global_inv_successi_routing = 0
+global_inv_tempi = []
+
 global_com_successi = 0
-global_com_errori_json = 0
-global_com_allucinazioni_fissi = 0
+global_com_tempi = []
 
-print(f"Avvio test statistico: {len(scenari)} scenari x {NUM_ITERAZIONI} iterazioni = {totale_run} chiamate totali per agente.\n")
+totale_run_inv = len(scenari) * NUM_ITERAZIONI
+totale_run_com = sum(1 for s in scenari if s["testa_comandante"]) * NUM_ITERAZIONI
 
-for idx, scenario in enumerate(scenari):
-    print(f"\n{'='*50}\nTESTING: {scenario['nome']}\n{'='*50}")
+print(f"Avvio Benchmark Avanzato: {len(scenari)} scenari x {NUM_ITERAZIONI} iterazioni.\n")
+
+for scenario in scenari:
+    print(f"\n{'='*60}\nTESTING: {scenario['nome']}\n{'='*60}")
     
     stats_inv_stati = []
-    stats_inv_errori = 0
+    stats_inv_richieste = []
+    stats_inv_tempi_scenario = []
+    
     stats_com_droni = []
-    stats_com_errori = 0
-    stats_com_allucinazioni_fissi = 0
+    stats_com_tempi_scenario = []
     
     for i in range(NUM_ITERAZIONI):
-        print(f"Iter {i+1}/{NUM_ITERAZIONI}...", end=" ", flush=True)
+        print(f".", end="", flush=True)
         
-        # ----------------------------------------------------
-        # 1. VALUTAZIONE INVESTIGATORE
-        # ----------------------------------------------------
+        # --- TEST INVESTIGATORE ---
+        start_time_inv = time.time()
         raw_inv = chain_investigatore.invoke({
             "coordinate_epicentro": scenario["coord"],
             "contesto_eventi": scenario["contesto"],
             "dispositivi_attivi": disp_attivi_inv
         })
+        end_time_inv = time.time()
+        stats_inv_tempi_scenario.append(end_time_inv - start_time_inv)
+        
         try:
             testo_pulito = raw_inv.replace("```json", "").replace("```", "").strip()
             if "{" in testo_pulito and "}" in testo_pulito:
                 testo_pulito = testo_pulito[testo_pulito.find("{"):testo_pulito.rfind("}")+1]
             res_inv = json.loads(testo_pulito)
-            stats_inv_stati.append(res_inv.get("stato_zona", "SCONOSCIUTO"))
+            
+            stats_inv_stati.append(res_inv.get("stato_zona", "ERRORE"))
+            richieste = res_inv.get("id_dispositivi_richiesti", [])
+            stats_inv_richieste.append(richieste[0] if richieste else "NESSUNO")
         except Exception:
-            stats_inv_errori += 1
             stats_inv_stati.append("ERRORE_JSON")
+            stats_inv_richieste.append("ERRORE_JSON")
 
-        # ----------------------------------------------------
-        # 2. VALUTAZIONE COMANDANTE (Con Input Mockato Perfetto)
-        # ----------------------------------------------------
-        prompt_com = get_prompt_comandante(
-            epicentro_id="epi_test",
-            coordinate_str=scenario["coord"],
-            dispositivi_trigger=["CAM_NORD"],
-            motivazione_analisi=scenario["mock_inv_motivazione"],
-            pericoli_rilevati=scenario["mock_inv_pericoli"],
-            dispositivi_str=disp_attivi_com,
-            lat_esatta=37.514, lon_esatta=15.092
-        )
-        
-        raw_com = llm.invoke(prompt_com)
-        try:
-            testo_pulito_com = raw_com.replace("```json", "").replace("```", "").strip()
-            if "{" in testo_pulito_com and "}" in testo_pulito_com:
-                testo_pulito_com = testo_pulito_com[testo_pulito_com.find("{"):testo_pulito_com.rfind("}")+1]
-            res_com = json.loads(testo_pulito_com)
+        # --- TEST COMANDANTE (Se applicabile) ---
+        if scenario["testa_comandante"]:
+            prompt_com = get_prompt_comandante(
+                epicentro_id="epi_test",
+                coordinate_str=scenario["coord"],
+                dispositivi_trigger=["TRIGGER_TEST"],
+                motivazione_analisi=scenario["mock_inv_motivazione"],
+                pericoli_rilevati=scenario["mock_inv_pericoli"],
+                dispositivi_str=disp_attivi_com,
+                lat_esatta=37.514, lon_esatta=15.092
+            )
             
-            droni_selezionati = res_com.get("dispositivi_tattici_attivati", [])
-            if not droni_selezionati or droni_selezionati == ["NESSUNO"]:
-                stats_com_droni.append("NESSUNO")
-            else:
-                stats_com_droni.extend(droni_selezionati)
-                
-            sensori_fissi = ["CAM_NORD", "MIC_EST", "TEMP_01"]
-            if any(f in str(droni_selezionati) for f in sensori_fissi):
-                stats_com_allucinazioni_fissi += 1
-                
-        except Exception:
-            stats_com_errori += 1
-            stats_com_droni.append("ERRORE_JSON")
+            start_time_com = time.time()
+            raw_com = llm.invoke(prompt_com)
+            end_time_com = time.time()
+            stats_com_tempi_scenario.append(end_time_com - start_time_com)
             
-        print("Fatto.")
+            try:
+                testo_pulito_com = raw_com.replace("```json", "").replace("```", "").strip()
+                if "{" in testo_pulito_com and "}" in testo_pulito_com:
+                    testo_pulito_com = testo_pulito_com[testo_pulito_com.find("{"):testo_pulito_com.rfind("}")+1]
+                res_com = json.loads(testo_pulito_com)
+                
+                droni = res_com.get("dispositivi_tattici_attivati", [])
+                stats_com_droni.append(droni[0] if droni and droni != ["NESSUNO"] else "NESSUNO")
+            except Exception:
+                stats_com_droni.append("ERRORE_JSON")
 
-    # --- RISULTATI PER SCENARIO ---
+    print(" Fatto!")
+    
+    # --- CALCOLI REPORT SCENARIO ---
     count_inv = Counter(stats_inv_stati)
-    count_com = Counter(stats_com_droni)
+    count_req = Counter(stats_inv_richieste)
     
-    successi_inv_scenario = count_inv.get(scenario['atteso_inv_stato'], 0)
-    successi_com_scenario = count_com.get(scenario['atteso_com_drone'], 0)
+    acc_inv_stato = (count_inv.get(scenario['atteso_inv_stato'], 0) / NUM_ITERAZIONI) * 100
+    acc_inv_routing = (count_req.get(scenario['atteso_inv_richiesta'], 0) / NUM_ITERAZIONI) * 100
+    avg_time_inv = sum(stats_inv_tempi_scenario) / len(stats_inv_tempi_scenario)
     
-    # Aggiornamento Variabili Globali
-    global_inv_successi += successi_inv_scenario
-    global_inv_errori_json += stats_inv_errori
-    global_com_successi += successi_com_scenario
-    global_com_errori_json += stats_com_errori
-    global_com_allucinazioni_fissi += stats_com_allucinazioni_fissi
+    global_inv_successi_stato += count_inv.get(scenario['atteso_inv_stato'], 0)
+    global_inv_successi_routing += count_req.get(scenario['atteso_inv_richiesta'], 0)
+    global_inv_tempi.extend(stats_inv_tempi_scenario)
     
-    inv_acc = (successi_inv_scenario / NUM_ITERAZIONI) * 100
-    com_acc = (successi_com_scenario / NUM_ITERAZIONI) * 100
+    print(f"INVESTIGATORE:")
+    print(f"  - Obiettivo Stato [{scenario['atteso_inv_stato']}]: {acc_inv_stato}%")
+    print(f"  - Obiettivo Routing [{scenario['atteso_inv_richiesta']}]: {acc_inv_routing}%")
+    print(f"  - Tempo Medio Risposta: {avg_time_inv:.2f} secondi")
+    print(f"  - Dettaglio Stati: {dict(count_inv)}")
+    print(f"  - Dettaglio Routing: {dict(count_req)}")
     
-    print(f"\n--- REPORT PARZIALE: {scenario['nome']} ---")
-    print(f"INVESTIGATORE: Accuratezza {inv_acc}% | Errori JSON: {stats_inv_errori}")
-    print(f"  Distribuzione: {dict(count_inv)}")
-    print(f"COMANDANTE: Accuratezza {com_acc}% | Allucinazioni Fissi: {stats_com_allucinazioni_fissi} | Errori JSON: {stats_com_errori}")
-    print(f"  Distribuzione: {dict(count_com)}")
+    if scenario["testa_comandante"]:
+        count_com = Counter(stats_com_droni)
+        acc_com = (count_com.get(scenario['atteso_com_drone'], 0) / NUM_ITERAZIONI) * 100
+        avg_time_com = sum(stats_com_tempi_scenario) / len(stats_com_tempi_scenario)
+        
+        global_com_successi += count_com.get(scenario['atteso_com_drone'], 0)
+        global_com_tempi.extend(stats_com_tempi_scenario)
+        
+        print(f"COMANDANTE:")
+        print(f"  - Obiettivo Tattico [{scenario['atteso_com_drone']}]: {acc_com}%")
+        print(f"  - Tempo Medio Risposta: {avg_time_com:.2f} secondi")
+        print(f"  - Dettaglio Droni Scelti: {dict(count_com)}")
 
 
 # ==========================================
 # REPORT GLOBALE FINALE
 # ==========================================
-print("\n" + "="*50)
-print(" 📊 REPORT GLOBALE E METRICHE DI SISTEMA")
-print("="*50)
+print("\n" + "="*60)
+print(" 📊 METRICHE GLOBALI DEL DIGITAL TWIN")
+print("="*60)
 
-# Calcolo Metriche Globali
-acc_globale_inv = (global_inv_successi / totale_run) * 100
-err_globale_inv = (global_inv_errori_json / totale_run) * 100
+avg_global_inv_time = sum(global_inv_tempi) / len(global_inv_tempi) if global_inv_tempi else 0
+avg_global_com_time = sum(global_com_tempi) / len(global_com_tempi) if global_com_tempi else 0
 
-acc_globale_com = (global_com_successi / totale_run) * 100
-err_globale_com = (global_com_errori_json / totale_run) * 100
-alluc_fissi_com = (global_com_allucinazioni_fissi / totale_run) * 100
+print(f"🔹 NODO INVESTIGATORE ({totale_run_inv} inferenze totali)")
+print(f"  - Accuratezza Comprensione Stato: {(global_inv_successi_stato / totale_run_inv) * 100:.2f}%")
+print(f"  - Accuratezza Routing (Scelta Sensore): {(global_inv_successi_routing / totale_run_inv) * 100:.2f}%")
+print(f"  - Latenza Media: {avg_global_inv_time:.2f} secondi")
 
-print(f"🔹 NODO INVESTIGATORE (Task: Comprensione del contesto e Stato Zona)")
-print(f"  - Accuratezza Decisionale Globale : {acc_globale_inv:.2f}% ({global_inv_successi}/{totale_run})")
-print(f"  - Tasso Fallimento Sintassi JSON  : {err_globale_inv:.2f}% ({global_inv_errori_json}/{totale_run})")
-
-print(f"\n🔹 NODO COMANDANTE (Task: Routing Tattico e Gestione Droni)")
-print(f"  - Accuratezza Tattica Globale     : {acc_globale_com:.2f}% ({global_com_successi}/{totale_run})")
-print(f"  - Tasso Allucinazione Entità Fisse: {alluc_fissi_com:.2f}% ({global_com_allucinazioni_fissi}/{totale_run})")
-print(f"  - Tasso Fallimento Sintassi JSON  : {err_globale_com:.2f}% ({global_com_errori_json}/{totale_run})")
-
-print("\nValutazione statistica completata.")
-print("="*50)
+print(f"\n🔹 NODO COMANDANTE ({totale_run_com} inferenze totali)")
+print(f"  - Accuratezza Scelta Tattica: {(global_com_successi / totale_run_com) * 100:.2f}%")
+print(f"  - Latenza Media: {avg_global_com_time:.2f} secondi")
+print("="*60)
