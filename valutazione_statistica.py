@@ -69,7 +69,7 @@ def ottieni_contesto_visivo_reale(image_path):
         return "Error reading image.", 0.0
 
 # ==========================================
-# GOLDEN DATASET (Metriche Flessibili)
+# GOLDEN DATASET COMPLETO (I 9 Scenari con Metriche Flessibili)
 # ==========================================
 scenari = [
     {
@@ -77,7 +77,24 @@ scenari = [
         "coord": "37.514077, 15.092305",
         "contesto": json.dumps([{"id_dispositivo": "MIC_EST", "dato_rilevato": {"allarme": "boato_rilevato", "trascrizione_audio": "Forte boato e rumori metallici."}}]),
         "atteso_inv_stato": "ANOMALIA", 
-        "attesi_inv_richiesta": ["CAM_NORD", "DRONE_01"], # Entrambi validi per ispezione visiva
+        "attesi_inv_richiesta": ["CAM_NORD", "DRONE_01"],
+        "testa_comandante": False
+    },
+    {
+        "nome": "SCENARIO 2: Solo Sensore Termico",
+        "coord": "37.514206, 15.092822",
+        "contesto": json.dumps([{"id_dispositivo": "TEMP_01", "dato_rilevato": {"allarme": "TEMPERATURA_CRITICA", "temperatura": 85.5}}]),
+        "atteso_inv_stato": "ANOMALIA", 
+        "attesi_inv_richiesta": ["CAM_NORD", "DRONE_01"], 
+        "testa_comandante": False
+    },
+    {
+        "nome": "SCENARIO 3: Solo Telecamera (Normale)",
+        "coord": "37.514511, 15.092750",
+        "immagine_reale": "./Logica_di_Test/Data_Pool/Telecamere/NORMALE/strada_normale_1.jpeg",
+        "contesto_base": [{"id_dispositivo": "CAM_NORD", "analisi_telecamera_vlm": "{VLM_PLACEHOLDER}"}],
+        "atteso_inv_stato": "NORMALE", 
+        "attesi_inv_richiesta": ["NESSUNO"], 
         "testa_comandante": False
     },
     {
@@ -89,8 +106,8 @@ scenari = [
         "attesi_inv_richiesta": ["NESSUNO"],
         "testa_comandante": True, 
         "mock_inv_motivazione": "Incendio confermato visivamente.", 
-        "mock_inv_pericoli": ["incendio strutturale"], 
-        "attesi_com_droni": ["DRONE_02", "DRONE_03"] # Entrambi specializzati per incendi
+        "mock_inv_pericoli": ["incendio strutturale", "fumo"], 
+        "attesi_com_droni": ["DRONE_02", "DRONE_03"] 
     },
     {
         "nome": "SCENARIO 5: Solo Telecamera (Incidente)",
@@ -101,8 +118,65 @@ scenari = [
         "attesi_inv_richiesta": ["NESSUNO"],
         "testa_comandante": True, 
         "mock_inv_motivazione": "Scontro tra veicoli.", 
-        "mock_inv_pericoli": ["incidente stradale"], 
-        "attesi_com_droni": ["DRONE_01"] # Unico ricognitore
+        "mock_inv_pericoli": ["incidente stradale", "veicoli danneggiati"], 
+        "attesi_com_droni": ["DRONE_01"] 
+    },
+    {
+        "nome": "SCENARIO 6: Falso Allarme (Mic Boato -> Cam Normale)",
+        "coord": "37.514077, 15.092305",
+        "immagine_reale": "./Logica_di_Test/Data_Pool/Telecamere/NORMALE/strada_normale_2.jpeg",
+        "contesto_base": [
+            {"id_dispositivo": "MIC_EST", "dato_rilevato": {"allarme": "boato_rilevato"}},
+            {"id_dispositivo": "CAM_NORD", "analisi_telecamera_vlm": "{VLM_PLACEHOLDER}"}
+        ],
+        "atteso_inv_stato": "NORMALE", 
+        "attesi_inv_richiesta": ["NESSUNO"], 
+        "testa_comandante": False
+    },
+    {
+        "nome": "SCENARIO 7: Escalation (Temp Alta -> Cam Incendio)",
+        "coord": "37.514206, 15.092822",
+        "immagine_reale": "./Logica_di_Test/Data_Pool/Telecamere/CRITICO/incendio_palazzo.jpeg",
+        "contesto_base": [
+            {"id_dispositivo": "TEMP_01", "dato_rilevato": {"allarme": "TEMPERATURA_CRITICA", "temperatura": 90.0}},
+            {"id_dispositivo": "CAM_NORD", "analisi_telecamera_vlm": "{VLM_PLACEHOLDER}"}
+        ],
+        "atteso_inv_stato": "CRITICO", 
+        "attesi_inv_richiesta": ["NESSUNO"],
+        "testa_comandante": True, 
+        "mock_inv_motivazione": "Allarme termico confermato visivamente: grave incendio in corso.", 
+        "mock_inv_pericoli": ["incendio strutturale", "fumo"], 
+        "attesi_com_droni": ["DRONE_02", "DRONE_03"]
+    },
+    {
+        "nome": "SCENARIO 8: Escalation (Mic Boato -> Cam Incendio)",
+        "coord": "37.514077, 15.092305",
+        "immagine_reale": "./Logica_di_Test/Data_Pool/Telecamere/CRITICO/incendio_palazzo.jpeg",
+        "contesto_base": [
+            {"id_dispositivo": "MIC_EST", "dato_rilevato": {"allarme": "boato_rilevato", "trascrizione_audio": "Forte boato."}},
+            {"id_dispositivo": "CAM_NORD", "analisi_telecamera_vlm": "{VLM_PLACEHOLDER}"}
+        ],
+        "atteso_inv_stato": "CRITICO", 
+        "attesi_inv_richiesta": ["NESSUNO"],
+        "testa_comandante": True, 
+        "mock_inv_motivazione": "Il boato è stato confermato dalla telecamera: esplosione e incendio.", 
+        "mock_inv_pericoli": ["incendio", "esplosione"], 
+        "attesi_com_droni": ["DRONE_02", "DRONE_03"]
+    },
+    {
+        "nome": "SCENARIO 9: Escalation (Mic Boato -> Cam Incidente)",
+        "coord": "37.514077, 15.092305",
+        "immagine_reale": "./Logica_di_Test/Data_Pool/Telecamere/CRITICO/incidente_stradale.jpeg",
+        "contesto_base": [
+            {"id_dispositivo": "MIC_EST", "dato_rilevato": {"allarme": "boato_rilevato", "trascrizione_audio": "Forte rumore metallico."}},
+            {"id_dispositivo": "CAM_NORD", "analisi_telecamera_vlm": "{VLM_PLACEHOLDER}"}
+        ],
+        "atteso_inv_stato": "CRITICO", 
+        "attesi_inv_richiesta": ["NESSUNO"],
+        "testa_comandante": True, 
+        "mock_inv_motivazione": "Il rumore metallico è confermato: grave incidente stradale.", 
+        "mock_inv_pericoli": ["incidente stradale", "traffico bloccato"], 
+        "attesi_com_droni": ["DRONE_01"]
     }
 ]
 
@@ -110,12 +184,20 @@ scenari = [
 # PRE-COMPUTAZIONE VLM (Eseguita sulla Jetson)
 # ==========================================
 print("\n" + "="*70 + "\n FASE 1: PRE-COMPUTAZIONE VLM & DISTANZE SPAZIALI\n" + "="*70)
+
+vlm_cache = {}
+
 for scenario in scenari:
     scenario["vlm_latenza"] = 0.0
     if "immagine_reale" in scenario:
-        desc, latenza = ottieni_contesto_visivo_reale(scenario["immagine_reale"])
-        scenario["contesto_iniettato"] = json.dumps(scenario["contesto_base"]).replace("{VLM_PLACEHOLDER}", desc)
-        scenario["vlm_latenza"] = latenza
+        img_path = scenario["immagine_reale"]
+        # Usa la cache se abbiamo già processato questa immagine
+        if img_path not in vlm_cache:
+            desc, latenza = ottieni_contesto_visivo_reale(img_path)
+            vlm_cache[img_path] = {"desc": desc, "latenza": latenza}
+        
+        scenario["contesto_iniettato"] = json.dumps(scenario["contesto_base"]).replace("{VLM_PLACEHOLDER}", vlm_cache[img_path]["desc"])
+        scenario["vlm_latenza"] = vlm_cache[img_path]["latenza"]
     else:
         scenario["contesto_iniettato"] = scenario["contesto"]
 
@@ -182,7 +264,6 @@ for nome_modello, llm_model in modelli_da_testare.items():
             except Exception:
                 pass
             
-            # Somma il tempo del VLM (reale) al tempo del LLM per la latenza End-to-End
             stats_modello["inv_tempi"].append((time.time() - start_inv) + scenario["vlm_latenza"])
 
             # --- COMANDANTE ---
