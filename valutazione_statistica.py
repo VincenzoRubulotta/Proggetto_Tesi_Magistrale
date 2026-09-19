@@ -2,10 +2,12 @@ import os
 import json
 import time
 import base64
+from datetime import datetime
 from collections import Counter
 from dotenv import load_dotenv
 from langchain_ollama import OllamaLLM, ChatOllama
 from langchain_groq import ChatGroq
+from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 from langchain_core.prompts import PromptTemplate
 from prompts import TEMPLATE_INVESTIGATORE, get_prompt_comandante
@@ -14,13 +16,27 @@ from utils import formatta_dispositivi_investigatore, ordina_e_taglia_dispositiv
 load_dotenv()
 
 # ==========================================
-# SCUDERIA MODELLI
+# SCUDERIA MODELLI (Edge vs Cloud vs Competitors)
 # ==========================================
 modelli_da_testare = {
-    "1. GPT-OSS-20B (CLOUD API - Taglia Superiore)": ChatGroq(
+    "1. Llama-3.2-3B (CLOUD API - OpenRouter FREE)": ChatOpenAI(
+        model="meta-llama/llama-3.2-3b-instruct",
+        api_key=os.getenv("OPENROUTER_API_KEY", "chiave_mancante"),
+        base_url="https://openrouter.ai/api/v1",
+        temperature=0.0,
+        model_kwargs={"response_format": {"type": "json_object"}}
+    ),
+    "2. Phi-3-Mini-3.8B (CLOUD API - OpenRouter FREE)": ChatOpenAI(
+        model="microsoft/phi-3-mini-128k-instruct",
+        api_key=os.getenv("OPENROUTER_API_KEY", "chiave_mancante"),
+        base_url="https://openrouter.ai/api/v1",
+        temperature=0.0,
+        model_kwargs={"response_format": {"type": "json_object"}}
+    ),
+    "3. GPT-OSS-20B (CLOUD API - Groq - Taglia Superiore)": ChatGroq(
         model_name="openai/gpt-oss-20b", temperature=0.0, model_kwargs={"response_format": {"type": "json_object"}}
     ),
-    "2. Llama-3.2-3B (LOCALE EDGE - Jetson)": OllamaLLM(
+    "4. Llama-3.2-3B (LOCALE EDGE - Jetson)": OllamaLLM(
         model="llama3.2", base_url="http://localhost:11434", format="json", temperature=0.0
     )
 }
@@ -188,7 +204,6 @@ for scenario in scenari:
     scenario["vlm_latenza"] = 0.0
     if "immagine_reale" in scenario:
         img_path = scenario["immagine_reale"]
-        # Usa la cache se abbiamo già processato questa immagine
         if img_path not in vlm_cache:
             desc, latenza = ottieni_contesto_visivo_reale(img_path)
             vlm_cache[img_path] = {"desc": desc, "latenza": latenza}
@@ -222,7 +237,6 @@ for nome_modello, llm_model in modelli_da_testare.items():
         print(f"\n  -> {scenario['nome']} ", end="", flush=True)
         lat_ev, lon_ev = map(float, scenario["coord"].split(","))
         
-        # Calcolo dinamico spaziale per lo scenario corrente
         disp_attivi_inv_str = "\n".join(formatta_dispositivi_investigatore(dispositivi_db, lat_ev, lon_ev))
         disp_attivi_com_str = ordina_e_taglia_dispositivi_comandante(dispositivi_db, lat_ev, lon_ev)
         
@@ -250,7 +264,6 @@ for nome_modello, llm_model in modelli_da_testare.items():
                 req = res_inv.get("id_dispositivi_richiesti", [])
                 scelta_req = req[0] if req else "NESSUNO"
                 
-                # Tracciamento Errori Fini
                 if scelta_req not in ID_VALIDI and scelta_req != "NESSUNO":
                     stats_modello["allucinazioni_id"] += 1
                 elif scelta_req in scenario['attesi_inv_richiesta']:
@@ -297,21 +310,35 @@ for nome_modello, llm_model in modelli_da_testare.items():
     statistiche_modelli[nome_modello] = stats_modello
 
 # ==========================================
-# REPORT COMPARATIVO FINALE
+# REPORT COMPARATIVO FINALE E SALVATAGGIO TXT
 # ==========================================
-print("\n\n" + "="*80)
-print(" 📊 REPORT COMPARATIVO END-TO-END (VLM + LLM)")
-print("="*80)
-
-for nome, stats in statistiche_modelli.items():
-    avg_inv_time = sum(stats["inv_tempi"]) / len(stats["inv_tempi"]) if stats["inv_tempi"] else 0
-    avg_com_time = sum(stats["com_tempi"]) / len(stats["com_tempi"]) if stats["com_tempi"] else 0
+def genera_report(stats_dict, tot_inv, tot_com):
+    report = []
+    report.append("="*80)
+    report.append(f" 📊 REPORT COMPARATIVO END-TO-END (Generato il {datetime.now().strftime('%Y-%m-%d %H:%M:%S')})")
+    report.append("="*80)
     
-    print(f"\n🔹 {nome}")
-    print(f"  - Accuratezza Investigatore (Stato):   {(stats['inv_successi_stato'] / totale_run_inv) * 100:.2f}%")
-    print(f"  - Accuratezza Investigatore (Routing): {(stats['inv_successi_routing'] / totale_run_inv) * 100:.2f}%")
-    print(f"  - Accuratezza Comandante (Tattica):    {(stats['com_successi'] / totale_run_com) * 100:.2f}%")
-    print(f"  - Latenza End-to-End Media:            {avg_inv_time + avg_com_time:.2f} sec (Incluso processing visivo VLM)")
-    print(f"  - Errori Sintassi JSON (Fatal):        {stats['errori_sintassi']}")
-    print(f"  - Allucinazioni ID Dispositivo:        {stats['allucinazioni_id']}")
-print("="*80)
+    for nome, stats in stats_dict.items():
+        avg_inv_time = sum(stats["inv_tempi"]) / len(stats["inv_tempi"]) if stats["inv_tempi"] else 0
+        avg_com_time = sum(stats["com_tempi"]) / len(stats["com_tempi"]) if stats["com_tempi"] else 0
+        
+        report.append(f"\n🔹 {nome}")
+        report.append(f"  - Accuratezza Investigatore (Stato):   {(stats['inv_successi_stato'] / tot_inv) * 100:.2f}%")
+        report.append(f"  - Accuratezza Investigatore (Routing): {(stats['inv_successi_routing'] / tot_inv) * 100:.2f}%")
+        report.append(f"  - Accuratezza Comandante (Tattica):    {(stats['com_successi'] / tot_com) * 100:.2f}%")
+        report.append(f"  - Latenza End-to-End Media:            {avg_inv_time + avg_com_time:.2f} sec (Incluso processing visivo VLM)")
+        report.append(f"  - Errori Sintassi JSON (Fatal):        {stats['errori_sintassi']}")
+        report.append(f"  - Allucinazioni ID Dispositivo:        {stats['allucinazioni_id']}")
+    
+    report.append("="*80)
+    return "\n".join(report)
+
+testo_report = genera_report(statistiche_modelli, totale_run_inv, totale_run_com)
+print(testo_report)
+
+# Salvataggio su file
+file_name = f"benchmark_report_{int(time.time())}.txt"
+with open(file_name, "w", encoding="utf-8") as f:
+    f.write(testo_report)
+
+print(f"\n✅ Il report è stato salvato correttamente nel file: {file_name}")
