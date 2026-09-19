@@ -18,13 +18,13 @@ load_dotenv()
 # ==========================================
 modelli_da_testare = {
     "1. Llama-3.2-3B (CLOUD API - Competitor Diretto)": ChatGroq(
-        model_name="llama-3.2-3b-preview", model_kwargs={"response_format": {"type": "json_object"}}
+        model_name="llama-3.2-3b-8192", model_kwargs={"response_format": {"type": "json_object"}}
     ),
-    "2. Llama-3.2-3B (LOCALE EDGE - Jetson)": OllamaLLM(
-        model="llama3.2", base_url="http://localhost:11434", format="json"
-    ),
-    "3. Llama-3.1-8B (CLOUD API - Taglia Superiore)": ChatGroq(
+    "2. Llama-3.1-8B (CLOUD API - Taglia Superiore)": ChatGroq(
         model_name="llama-3.1-8b-instant", model_kwargs={"response_format": {"type": "json_object"}}
+    ),
+    "3. Llama-3.2-3B (LOCALE EDGE - Jetson)": OllamaLLM(
+        model="llama3.2", base_url="http://localhost:11434", format="json"
     )
 }
 
