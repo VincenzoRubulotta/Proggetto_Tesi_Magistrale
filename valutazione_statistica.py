@@ -17,13 +17,10 @@ load_dotenv()
 # SCUDERIA MODELLI
 # ==========================================
 modelli_da_testare = {
-    "1. Allam-2-7B (CLOUD API - Taglia Media)": ChatGroq(
-        model_name="allam-2-7b", temperature=0.0, model_kwargs={"response_format": {"type": "json_object"}}
-    ),
-    "2. GPT-OSS-20B (CLOUD API - Taglia Superiore)": ChatGroq(
+    "1. GPT-OSS-20B (CLOUD API - Taglia Superiore)": ChatGroq(
         model_name="openai/gpt-oss-20b", temperature=0.0, model_kwargs={"response_format": {"type": "json_object"}}
     ),
-    "3. Llama-3.2-3B (LOCALE EDGE - Jetson)": OllamaLLM(
+    "2. Llama-3.2-3B (LOCALE EDGE - Jetson)": OllamaLLM(
         model="llama3.2", base_url="http://localhost:11434", format="json", temperature=0.0
     )
 }
