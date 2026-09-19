@@ -19,24 +19,17 @@ load_dotenv()
 # SCUDERIA MODELLI (Edge vs Cloud vs Competitors)
 # ==========================================
 modelli_da_testare = {
-    "1. Phi-3-Mini-4K (CLOUD API - GitHub Models FREE)": ChatOpenAI(
-        model="Phi-3-mini-4k-instruct", 
-        api_key=os.getenv("GITHUB_TOKEN", "chiave_mancante"),
-        base_url="https://models.inference.ai.azure.com",
-        temperature=0.0,
-        model_kwargs={"response_format": {"type": "json_object"}}
-    ),
-    "2. Llama-3.2-3B (CLOUD API - OpenRouter FREE)": ChatOpenAI(
+    "1. Llama-3.2-3B (CLOUD API - OpenRouter FREE)": ChatOpenAI(
         model="meta-llama/llama-3.2-3b-instruct",
         api_key=os.getenv("OPENROUTER_API_KEY", "chiave_mancante"),
         base_url="https://openrouter.ai/api/v1",
         temperature=0.0,
         model_kwargs={"response_format": {"type": "json_object"}}
     ),
-    "3. GPT-OSS-20B (CLOUD API - Groq - Taglia Superiore)": ChatGroq(
+    "2. GPT-OSS-20B (CLOUD API - Groq - Taglia Superiore)": ChatGroq(
         model_name="openai/gpt-oss-20b", temperature=0.0, model_kwargs={"response_format": {"type": "json_object"}}
     ),
-    "4. Llama-3.2-3B (LOCALE EDGE - Jetson)": OllamaLLM(
+    "3. Llama-3.2-3B (LOCALE EDGE - Jetson)": OllamaLLM(
         model="llama3.2", base_url="http://localhost:11434", format="json", temperature=0.0
     )
 }
