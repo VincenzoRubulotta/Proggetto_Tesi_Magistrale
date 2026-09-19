@@ -26,10 +26,10 @@ modelli_da_testare = {
         temperature=0.0,
         model_kwargs={"response_format": {"type": "json_object"}}
     ),
-    "2. Phi-3-Mini-3.8B (CLOUD API - OpenRouter FREE)": ChatOpenAI(
-        model="microsoft/phi-3-mini-128k-instruct",
-        api_key=os.getenv("OPENROUTER_API_KEY", "chiave_mancante"),
-        base_url="https://openrouter.ai/api/v1",
+    "2. Phi-3-Mini-4K (CLOUD API - GitHub Models FREE)": ChatOpenAI(
+        model="Phi-3-mini-4k-instruct", 
+        api_key=os.getenv("GITHUB_TOKEN", "chiave_mancante"),
+        base_url="https://models.inference.ai.azure.com",
         temperature=0.0,
         model_kwargs={"response_format": {"type": "json_object"}}
     ),
