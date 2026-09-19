@@ -261,8 +261,8 @@ for nome_modello, llm_model in modelli_da_testare.items():
                     
             except json.JSONDecodeError:
                 stats_modello["errori_sintassi"] += 1
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"\n  [ERRORE API INVESTIGATORE] {e}")
             
             stats_modello["inv_tempi"].append((time.time() - start_inv) + scenario["vlm_latenza"])
 
@@ -292,8 +292,8 @@ for nome_modello, llm_model in modelli_da_testare.items():
                         
                 except json.JSONDecodeError:
                     stats_modello["errori_sintassi"] += 1
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"\n  [ERRORE API COMANDANTE] {e}")
                 
                 stats_modello["com_tempi"].append(time.time() - start_com)
                 
