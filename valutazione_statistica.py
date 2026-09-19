@@ -28,7 +28,7 @@ modelli_da_testare = {
     )
 }
 
-vlm = ChatOllama(model="moondream", base_url="http://localhost:11434", temperature=0.0)
+vlm = ChatOllama(model="moondream", base_url="http://localhost:11434")
 NUM_ITERAZIONI = 10 
 
 # ==========================================
