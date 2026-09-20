@@ -16,21 +16,29 @@ from utils import formatta_dispositivi_investigatore, ordina_e_taglia_dispositiv
 load_dotenv()
 
 # ==========================================
-# SCUDERIA MODELLI (Edge vs Cloud vs Competitors)
+# MODELLI (Edge & Cloud) - Temperature di default
 # ==========================================
 modelli_da_testare = {
     "1. Llama-3.2-3B (CLOUD API - OpenRouter FREE)": ChatOpenAI(
         model="meta-llama/llama-3.2-3b-instruct",
         api_key=os.getenv("OPENROUTER_API_KEY", "chiave_mancante"),
         base_url="https://openrouter.ai/api/v1",
-        temperature=0.0,
         model_kwargs={"response_format": {"type": "json_object"}}
     ),
     "2. GPT-OSS-20B (CLOUD API - Groq - Taglia Superiore)": ChatGroq(
-        model_name="openai/gpt-oss-20b", temperature=0.0, model_kwargs={"response_format": {"type": "json_object"}}
+        model_name="openai/gpt-oss-20b", 
+        max_tokens=2048, 
+        model_kwargs={"response_format": {"type": "json_object"}}
     ),
     "3. Llama-3.2-3B (LOCALE EDGE - Jetson)": OllamaLLM(
-        model="llama3.2", base_url="http://localhost:11434", format="json", temperature=0.0
+        model="llama3.2", 
+        base_url="http://localhost:11434", 
+        format="json"
+    ),
+    "4. Qwen-2.5-3B (LOCALE EDGE - Sfidante)": OllamaLLM(
+        model="qwen2.5:3b", 
+        base_url="http://localhost:11434", 
+        format="json"
     )
 }
 
@@ -38,7 +46,7 @@ vlm = ChatOllama(model="moondream", base_url="http://localhost:11434")
 NUM_ITERAZIONI = 10 
 
 # ==========================================
-# DATABASE DISPOSITIVI DINAMICO (Reale)
+# DATABASE DISPOSITIVI DINAMICO 
 # ==========================================
 dispositivi_db = [
     {"id_dispositivo": "MIC_EST", "tipo_dispositivo": "microfono", "is_mobile": False, "posizione": {"coordinate": {"latitudine": 37.514077, "longitudine": 15.092305}}, "batteria": 100, "specializzazioni": ["sirene", "esplosioni", "rumori_anomali"]},
@@ -51,7 +59,7 @@ dispositivi_db = [
 ID_VALIDI = [d["id_dispositivo"] for d in dispositivi_db]
 
 # ==========================================
-# FUNZIONE HELPER PER IL VLM (Con tracciamento Latenza)
+# FUNZIONI HELPER
 # ==========================================
 def ottieni_contesto_visivo_reale(image_path):
     print(f"  [VLM] Inferenza su {image_path}...")
@@ -74,8 +82,24 @@ def ottieni_contesto_visivo_reale(image_path):
         print(f"  [VLM ERRORE] {e}")
         return "Error reading image.", 0.0
 
+def estrai_tokens(raw_response, fallback_text):
+    """Estrae i token generati in modo agnostico rispetto al provider (Groq/OpenAI/Ollama)."""
+    if hasattr(raw_response, 'response_metadata'):
+        meta = raw_response.response_metadata
+        if 'eval_count' in meta: return meta['eval_count']  # Ollama
+        if 'token_usage' in meta and 'completion_tokens' in meta['token_usage']:
+            return meta['token_usage']['completion_tokens'] # Groq / OpenAI
+    # Fallback matematico se i metadati non sono disponibili (stima: ~4 caratteri per token in JSON)
+    return len(fallback_text) // 4
+
+def calcola_percentile(dati, percentile):
+    if not dati: return 0.0
+    s_dati = sorted(dati)
+    idx = int((percentile / 100) * len(s_dati))
+    return s_dati[min(idx, len(s_dati)-1)]
+
 # ==========================================
-# GOLDEN DATASET COMPLETO (I 9 Scenari con Metriche Flessibili)
+# DATASET COMPLETO
 # ==========================================
 scenari = [
     {
@@ -221,9 +245,12 @@ for nome_modello, llm_model in modelli_da_testare.items():
     chain_investigatore = prompt_inv | llm_model
     
     stats_modello = {
-        "inv_successi_stato": 0, "inv_successi_routing": 0, "inv_tempi": [],
-        "com_successi": 0, "com_tempi": [], 
-        "errori_sintassi": 0, "allucinazioni_id": 0
+        "inv_successi_stato": 0, "inv_successi_routing": 0, 
+        "inv_tempi_llm": [], "inv_tempi_totali": [], "inv_tps": [],
+        "com_successi": 0, "com_tempi": [], "com_tps": [],
+        "inv_errori_sintassi": 0, "com_errori_sintassi": 0, 
+        "inv_allucinazioni_id": 0, "com_allucinazioni_id": 0,
+        "dettaglio_scenari": {s["nome"]: {"inv_successi": 0, "com_successi": 0, "com_run": 0} for s in scenari}
     }
     
     for scenario in scenari:
@@ -245,32 +272,43 @@ for nome_modello, llm_model in modelli_da_testare.items():
                     "contesto_eventi": scenario["contesto_iniettato"],
                     "dispositivi_attivi": disp_attivi_inv_str
                 })
+                latenza_inv_llm = time.time() - start_inv
                 testo_inv = raw_inv.content if hasattr(raw_inv, 'content') else raw_inv
                 testo_pulito = testo_inv.replace("```json", "").replace("```", "").strip()
                 if "{" in testo_pulito and "}" in testo_pulito:
                     testo_pulito = testo_pulito[testo_pulito.find("{"):testo_pulito.rfind("}")+1]
                 res_inv = json.loads(testo_pulito)
                 
-                if res_inv.get("stato_zona") == scenario['atteso_inv_stato']:
-                    stats_modello["inv_successi_stato"] += 1
+                stato_ok = res_inv.get("stato_zona") == scenario['atteso_inv_stato']
+                if stato_ok: stats_modello["inv_successi_stato"] += 1
                 
                 req = res_inv.get("id_dispositivi_richiesti", [])
                 scelta_req = req[0] if req else "NESSUNO"
                 
+                routing_ok = False
                 if scelta_req not in ID_VALIDI and scelta_req != "NESSUNO":
-                    stats_modello["allucinazioni_id"] += 1
+                    stats_modello["inv_allucinazioni_id"] += 1
                 elif scelta_req in scenario['attesi_inv_richiesta']:
                     stats_modello["inv_successi_routing"] += 1
-                    
+                    routing_ok = True
+                
+                if stato_ok and routing_ok:
+                    stats_modello["dettaglio_scenari"][scenario["nome"]]["inv_successi"] += 1
+
+                # Throughput e Latenze
+                tok_inv = estrai_tokens(raw_inv, testo_inv)
+                if latenza_inv_llm > 0: stats_modello["inv_tps"].append(tok_inv / latenza_inv_llm)
+                stats_modello["inv_tempi_llm"].append(latenza_inv_llm)
+                stats_modello["inv_tempi_totali"].append(latenza_inv_llm + scenario["vlm_latenza"])
+
             except json.JSONDecodeError:
-                stats_modello["errori_sintassi"] += 1
+                stats_modello["inv_errori_sintassi"] += 1
             except Exception as e:
                 print(f"\n  [ERRORE API INVESTIGATORE] {e}")
-            
-            stats_modello["inv_tempi"].append((time.time() - start_inv) + scenario["vlm_latenza"])
 
             # --- COMANDANTE ---
             if scenario.get("testa_comandante"):
+                stats_modello["dettaglio_scenari"][scenario["nome"]]["com_run"] += 1
                 prompt_com = get_prompt_comandante(
                     epicentro_id="epi_test", coordinate_str=scenario["coord"], dispositivi_trigger=["TEST"],
                     motivazione_analisi=scenario["mock_inv_motivazione"], pericoli_rilevati=scenario["mock_inv_pericoli"],
@@ -279,6 +317,7 @@ for nome_modello, llm_model in modelli_da_testare.items():
                 start_com = time.time()
                 try:
                     raw_com = llm_model.invoke(prompt_com)
+                    latenza_com = time.time() - start_com
                     testo_com = raw_com.content if hasattr(raw_com, 'content') else raw_com
                     testo_pulito_com = testo_com.replace("```json", "").replace("```", "").strip()
                     if "{" in testo_pulito_com and "}" in testo_pulito_com:
@@ -289,16 +328,19 @@ for nome_modello, llm_model in modelli_da_testare.items():
                     scelta_drone = droni[0] if droni and droni != ["NESSUNO"] else "NESSUNO"
                     
                     if scelta_drone not in ID_VALIDI and scelta_drone != "NESSUNO":
-                        stats_modello["allucinazioni_id"] += 1
+                        stats_modello["com_allucinazioni_id"] += 1
                     elif scelta_drone in scenario['attesi_com_droni']:
                         stats_modello["com_successi"] += 1
-                        
+                        stats_modello["dettaglio_scenari"][scenario["nome"]]["com_successi"] += 1
+                    
+                    tok_com = estrai_tokens(raw_com, testo_com)
+                    if latenza_com > 0: stats_modello["com_tps"].append(tok_com / latenza_com)
+                    stats_modello["com_tempi"].append(latenza_com)
+
                 except json.JSONDecodeError:
-                    stats_modello["errori_sintassi"] += 1
+                    stats_modello["com_errori_sintassi"] += 1
                 except Exception as e:
                     print(f"\n  [ERRORE API COMANDANTE] {e}")
-                
-                stats_modello["com_tempi"].append(time.time() - start_com)
                 
     statistiche_modelli[nome_modello] = stats_modello
 
@@ -308,22 +350,60 @@ for nome_modello, llm_model in modelli_da_testare.items():
 def genera_report(stats_dict, tot_inv, tot_com):
     report = []
     report.append("="*80)
-    report.append(f" 📊 REPORT COMPARATIVO END-TO-END (Generato il {datetime.now().strftime('%Y-%m-%d %H:%M:%S')})")
+    report.append(f" 📊 REPORT COMPARATIVO AVANZATO (Generato il {datetime.now().strftime('%Y-%m-%d %H:%M:%S')})")
     report.append("="*80)
     
     for nome, stats in stats_dict.items():
-        avg_inv_time = sum(stats["inv_tempi"]) / len(stats["inv_tempi"]) if stats["inv_tempi"] else 0
-        avg_com_time = sum(stats["com_tempi"]) / len(stats["com_tempi"]) if stats["com_tempi"] else 0
+        # Calcolo Medie
+        avg_inv_llm = sum(stats["inv_tempi_llm"]) / len(stats["inv_tempi_llm"]) if stats["inv_tempi_llm"] else 0
+        avg_inv_tot = sum(stats["inv_tempi_totali"]) / len(stats["inv_tempi_totali"]) if stats["inv_tempi_totali"] else 0
+        avg_com = sum(stats["com_tempi"]) / len(stats["com_tempi"]) if stats["com_tempi"] else 0
         
+        # Throughput
+        tps_inv = sum(stats["inv_tps"]) / len(stats["inv_tps"]) if stats["inv_tps"] else 0
+        tps_com = sum(stats["com_tps"]) / len(stats["com_tps"]) if stats["com_tps"] else 0
+        
+        # Percentili e WCET
+        p95_inv = calcola_percentile(stats["inv_tempi_totali"], 95)
+        p95_com = calcola_percentile(stats["com_tempi"], 95)
+        wcet_inv = max(stats["inv_tempi_totali"]) if stats["inv_tempi_totali"] else 0
+        wcet_com = max(stats["com_tempi"]) if stats["com_tempi"] else 0
+
         report.append(f"\n🔹 {nome}")
+        report.append(f"  [METRICHE DI ACCURATEZZA]")
         report.append(f"  - Accuratezza Investigatore (Stato):   {(stats['inv_successi_stato'] / tot_inv) * 100:.2f}%")
         report.append(f"  - Accuratezza Investigatore (Routing): {(stats['inv_successi_routing'] / tot_inv) * 100:.2f}%")
         report.append(f"  - Accuratezza Comandante (Tattica):    {(stats['com_successi'] / tot_com) * 100:.2f}%")
-        report.append(f"  - Latenza End-to-End Media:            {avg_inv_time + avg_com_time:.2f} sec (Incluso processing visivo VLM)")
-        report.append(f"  - Errori Sintassi JSON (Fatal):        {stats['errori_sintassi']}")
-        report.append(f"  - Allucinazioni ID Dispositivo:        {stats['allucinazioni_id']}")
-    
-    report.append("="*80)
+        
+        report.append(f"\n  [ANALISI PRESTAZIONALE DISACCOPPIATA]")
+        report.append(f"  - Latenza Investigatore (Solo LLM):    {avg_inv_llm:.2f} s")
+        report.append(f"  - Latenza Investigatore (LLM + VLM):   {avg_inv_tot:.2f} s")
+        report.append(f"  - Throughput (Velocità Generazione):   Inv: {tps_inv:.1f} Tok/s | Com: {tps_com:.1f} Tok/s")
+        report.append(f"  - Percentile Latenza (P95 End-to-End): Inv: {p95_inv:.2f} s | Com: {p95_com:.2f} s")
+        report.append(f"  - Latenza Massima (WCET End-to-End):   Inv: {wcet_inv:.2f} s | Com: {wcet_com:.2f} s")
+        
+        report.append(f"\n  [TRACKING ERRORI E ALLUCINAZIONI]")
+        report.append(f"  - Errori Sintassi JSON:                Inv: {stats['inv_errori_sintassi']} | Com: {stats['com_errori_sintassi']}")
+        report.append(f"  - Allucinazioni ID Dispositivo:        Inv: {stats['inv_allucinazioni_id']} | Com: {stats['com_allucinazioni_id']}")
+        
+        report.append(f"\n  [DETTAGLIO CRITICITA' PER SCENARIO (Success rate < 100%)]")
+        nessun_errore = True
+        for scenario_nome, d in stats['dettaglio_scenari'].items():
+            inv_rate = (d['inv_successi'] / NUM_ITERAZIONI) * 100
+            if inv_rate < 100.0:
+                report.append(f"    - {scenario_nome} [Investigatore]: {inv_rate:.0f}% successi")
+                nessun_errore = False
+            
+            if d['com_run'] > 0:
+                com_rate = (d['com_successi'] / d['com_run']) * 100
+                if com_rate < 100.0:
+                    report.append(f"    - {scenario_nome} [Comandante]:    {com_rate:.0f}% successi")
+                    nessun_errore = False
+        
+        if nessun_errore:
+            report.append(f"    - Il modello ha superato tutti gli scenari senza fallimenti specifici.")
+            
+        report.append("="*80)
     return "\n".join(report)
 
 testo_report = genera_report(statistiche_modelli, totale_run_inv, totale_run_com)
@@ -334,4 +414,4 @@ file_name = f"benchmark_report_{int(time.time())}.txt"
 with open(file_name, "w", encoding="utf-8") as f:
     f.write(testo_report)
 
-print(f"\n✅ Il report è stato salvato correttamente nel file: {file_name}")
+print(f"\n✅ Il report avanzato è stato salvato correttamente nel file: {file_name}")
