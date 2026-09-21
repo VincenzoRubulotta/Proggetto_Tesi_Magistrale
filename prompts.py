@@ -112,7 +112,7 @@ Rispondi ESCLUSIVAMENTE in formato JSON con questa esatta struttura ordinata:
     "descrizione_situazione": "Descrizione dell'emergenza.",
     "dispositivi_coinvolti": ["Elenco ID dei dispositivi che hanno rilevato l'anomalia"],
     "posizione_esatta": {{
-        "epicentro": "{epicentro_id}",,
+        "epicentro": "{epicentro_id}",
         "latitudine": {lat_val},
         "longitudine": {lon_val}
     }},

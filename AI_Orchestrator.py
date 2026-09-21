@@ -15,6 +15,7 @@ import redis
 import ollama
 import paho.mqtt.client as mqtt
 from dotenv import load_dotenv
+from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
@@ -38,7 +39,22 @@ REDIS_DB = int(os.getenv("REDIS_DB", 0))
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 
 json_parser = JsonOutputParser()
-llm = OllamaLLM(model="llama3.2", base_url="http://host.docker.internal:11434", format="json")
+
+MODELLO_ATTIVO = "LLAMA_3B_LOCALE"
+# MODELLO_ATTIVO = "QWEN_3B_LOCALE"
+# MODELLO_ATTIVO = "GPT_20B_CLOUD"
+
+print(f"\n[INIT] Inizializzazione Cervello AI: {MODELLO_ATTIVO}")
+
+if MODELLO_ATTIVO == "LLAMA_3B_LOCALE":
+    llm = OllamaLLM(model="llama3.2", base_url="http://host.docker.internal:11434", format="json")
+elif MODELLO_ATTIVO == "QWEN_3B_LOCALE":
+    llm = OllamaLLM(model="qwen2.5:3b", base_url="http://host.docker.internal:11434", format="json")
+elif MODELLO_ATTIVO == "GPT_20B_CLOUD":
+    llm = ChatGroq(model_name="openai/gpt-oss-20b", max_tokens=2048, model_kwargs={"response_format": {"type": "json_object"}})
+else:
+    raise ValueError("Modello non riconosciuto. Controlla il nome in MODELLO_ATTIVO.")
+
 vlm = ChatOllama(model="moondream", base_url="http://host.docker.internal:11434")
 gestore_memoria = MemoriaSpazioTemporale(host=REDIS_HOST, port=REDIS_PORT, finestra_secondi=120)
 gestore_registro = RegistroDispositivi(host=REDIS_HOST, port=REDIS_PORT, timeout_secondi=300)
