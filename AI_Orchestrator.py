@@ -117,7 +117,9 @@ def nodo_investigatore(state: SmartCityState) -> SmartCityState:
         })
         
         try:
-            testo_pulito = risposta_grezza.replace("```json", "").replace("```", "").strip()
+            testo_inv = risposta_grezza.content if hasattr(risposta_grezza, 'content') else risposta_grezza
+            
+            testo_pulito = testo_inv.replace("```json", "").replace("```", "").strip()
             if "{" in testo_pulito and "}" in testo_pulito:
                 testo_pulito = testo_pulito[testo_pulito.find("{"):testo_pulito.rfind("}")+1]
                 
@@ -168,11 +170,15 @@ def nodo_correttore(state: SmartCityState) -> SmartCityState:
     })
     
     try:
-        testo_pulito = risposta_grezza.replace("```json", "").replace("```", "").strip()
+        # Estrazione sicura per Cloud (Groq/OpenAI) ed Edge (Ollama)
+        testo_inv = risposta_grezza.content if hasattr(risposta_grezza, 'content') else risposta_grezza
+        
+        testo_pulito = testo_inv.replace("```json", "").replace("```", "").strip()
         if "{" in testo_pulito and "}" in testo_pulito:
             testo_pulito = testo_pulito[testo_pulito.find("{"):testo_pulito.rfind("}")+1]
             
         risultato = json.loads(testo_pulito)
+            
         state["analisi_json"] = risultato
         state["errore_parsing"] = None
         print("[NODO CORRETTORE] JSON riparato e salvato con successo!")
