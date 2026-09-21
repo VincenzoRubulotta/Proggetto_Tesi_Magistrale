@@ -139,11 +139,18 @@
         var emergencyCircles = {};
 
         socket.on('emergency_circle', function(data) {
-            let epi = data.epicentro_id;
+            let lat = data.lat;
+            let lon = data.lon;
             
-            if (emergencyCircles[epi]) {
-                map.removeLayer(emergencyCircles[epi]);
-                delete emergencyCircles[epi];
+            for (let id in emergencyCircles) {
+                let circle = emergencyCircles[id];
+                let circleLat = circle.getLatLng().lat;
+                let circleLon = circle.getLatLng().lng;
+                
+                if (Math.abs(circleLat - lat) < 0.001 && Math.abs(circleLon - lon) < 0.001) {
+                    map.removeLayer(circle);
+                    delete emergencyCircles[id];
+                }
             }
             
             if (data.stato === "NORMALE") {
@@ -152,14 +159,15 @@
             
             let circleColor = data.stato === "CRITICO" ? "#ff4c4c" : "#ffcc00";
             
-            let circle = L.circle([data.lat, data.lon], {
+            let newCircle = L.circle([lat, lon], {
                 color: circleColor,
                 fillColor: circleColor,
                 fillOpacity: 0.2,
                 radius: 100 
             }).addTo(map);
             
-            emergencyCircles[epi] = circle;
+            let coordKey = `${lat}_${lon}`;
+            emergencyCircles[coordKey] = newCircle;
         });
     </script>
 </body>
