@@ -8,3 +8,5 @@ langchain-core
 langchain-ollama
 langgraph
 ollama
+langchain-groq
+langchain-openai
