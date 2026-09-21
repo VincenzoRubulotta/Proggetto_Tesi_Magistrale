@@ -19,26 +19,25 @@ load_dotenv()
 # MODELLI (Edge & Cloud) - Temperature di default
 # ==========================================
 modelli_da_testare = {
-    "1. Llama-3.2-3B (CLOUD API - OpenRouter FREE)": ChatOpenAI(
-        model="meta-llama/llama-3.2-3b-instruct",
-        api_key=os.getenv("OPENROUTER_API_KEY", "chiave_mancante"),
-        base_url="https://openrouter.ai/api/v1",
-        model_kwargs={"response_format": {"type": "json_object"}}
-    ),
-    "2. GPT-OSS-20B (CLOUD API - Groq - Taglia Superiore)": ChatGroq(
+    "1. GPT-OSS-20B (CLOUD API - Groq - FORZATO JSON)": ChatGroq(
         model_name="openai/gpt-oss-20b", 
         max_tokens=2048, 
         model_kwargs={"response_format": {"type": "json_object"}}
     ),
-    "3. Llama-3.2-3B (LOCALE EDGE - Jetson)": OllamaLLM(
+    "2. Qwen-2.5-3B (LOCALE EDGE - FORZATO JSON)": OllamaLLM(
+        model="qwen2.5:3b", 
+        base_url="http://localhost:11434", 
+        format="json"
+    ),
+    "3. Llama-3.2-3B (LOCALE EDGE - FORZATO JSON)": OllamaLLM(
         model="llama3.2", 
         base_url="http://localhost:11434", 
         format="json"
     ),
-    "4. Qwen-2.5-3B (LOCALE EDGE - Sfidante)": OllamaLLM(
-        model="qwen2.5:3b", 
-        base_url="http://localhost:11434", 
-        format="json"
+    "4. Llama-3.2-3B (LOCALE EDGE - TESTO LIBERO)": OllamaLLM(
+        model="llama3.2", 
+        base_url="http://localhost:11434"
+        # Parametro format="json" rimosso intenzionalmente
     )
 }
 
