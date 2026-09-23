@@ -18,7 +18,7 @@ services:
       - DEVICE_NAME=Mic_Piazza_Est
       - DEVICE_TYPE=microfono
       - IS_MOBILE=False
-      - SPECIALIZATIONS=sirene,esplosioni,rumori_anomali
+      - SPECIALIZATIONS=rilevamento_sirene,rilevamento_esplosioni,rilevamento_rumori_anomali
       - LATITUDE=37.514077
       - LONGITUDE=15.092305
     networks:
@@ -37,7 +37,7 @@ services:
       - DEVICE_NAME=Termometro_Piazza
       - DEVICE_TYPE=sensore_temperatura
       - IS_MOBILE=False
-      - SPECIALIZATIONS=incendi,rilevamento_calore
+      - SPECIALIZATIONS=rilevamento_incendi,rilevamento_calore
       - LATITUDE=37.514206
       - LONGITUDE=15.092822
     networks:
@@ -56,7 +56,7 @@ services:
       - DEVICE_NAME=Cam_Piazza_Nord
       - DEVICE_TYPE=telecamera
       - IS_MOBILE=False
-      - SPECIALIZATIONS=incendi,traffico
+      - SPECIALIZATIONS=rilevamento_incendi,rilevamento_traffico
       - LATITUDE=37.51451177399222
       - LONGITUDE=15.092750411644252
     networks:
