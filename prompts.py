@@ -118,6 +118,12 @@ Rispondi ESCLUSIVAMENTE in formato JSON con questa esatta struttura ordinata:
     }},
     "unita_intervento_umano": ["Elenco forze umane"],
     "motivazione_tattica_iot": "Spiega la scelta finale.",
-    "dispositivi_tattici_attivati": ["Elenco ID. Inserisci SOLO dispositivi con IS_MOBILE: true. Scrivi NESSUNO se non servono"]
+    "dispositivi_tattici_attivati": ["Elenco ID. Inserisci SOLO dispositivi con IS_MOBILE: true. Scrivi NESSUNO se non servono"],
+    "cap_info": {
+        "category": "Scegli ESATTAMENTE uno tra: [Fire, Safety, Security, Rescue, Transport, Met, Other]",
+        "urgency": "Scegli ESATTAMENTE uno tra: [Immediate, Expected, Future]",
+        "severity": "Scegli ESATTAMENTE uno tra: [Extreme, Severe, Moderate, Minor]",
+        "certainty": "Scegli ESATTAMENTE uno tra: [Observed, Likely, Possible]"
+    }
 }}
 """

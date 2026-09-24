@@ -1,9 +1,50 @@
-
+import os
 import math
 import json
 import base64
 import requests
+from datetime import datetime, timezone
 from langchain_core.messages import HumanMessage
+
+def genera_file_cap(decisione_json, epicentro_id, cartella_destinazione="/app/alerts"):
+    """Genera un file XML in standard CAP 1.2 dinamico basato sull'output del Comandante."""
+    
+    os.makedirs(cartella_destinazione, exist_ok=True)
+    timestamp_attuale = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+    
+    cap_info = decisione_json.get("cap_info", {})
+    category = cap_info.get("category", "Safety")
+    urgency = cap_info.get("urgency", "Immediate")
+    severity = cap_info.get("severity", "Severe")
+    certainty = cap_info.get("certainty", "Observed")
+    
+    event_name = f"Allarme di tipo {category}"
+    
+    cap_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<alert xmlns="urn:oasis:names:tc:emergency:cap:1.2">
+  <identifier>{epicentro_id}</identifier>
+  <sender>SmartCity_DigitalTwin_AI</sender>
+  <sent>{timestamp_attuale}</sent>
+  <status>Actual</status>
+  <msgType>Alert</msgType>
+  <scope>Public</scope>
+  <info>
+    <category>{category}</category>
+    <event>{event_name}</event>
+    <urgency>{urgency}</urgency>
+    <severity>{severity}</severity>
+    <certainty>{certainty}</certainty>
+  </info>
+</alert>"""
+
+    nome_file = f"{epicentro_id}.xml"
+    percorso_file = os.path.join(cartella_destinazione, nome_file)
+    
+    with open(percorso_file, "w", encoding="utf-8") as f:
+        f.write(cap_xml)
+        
+    print(f"[CAP GENERATOR] File standard CAP dinamico salvato: {percorso_file}")
+
 
 def calcola_distanza(lat1, lon1, lat2, lon2):
     """Calcola la distanza in metri tra due coordinate GPS usando la formula di Haversine."""

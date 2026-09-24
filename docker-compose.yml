@@ -59,6 +59,8 @@ services:
       - PYTHONUNBUFFERED=1
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - ./Alerts_CAP:/app/alerts
     networks:
       - smartcity_net
     depends_on:

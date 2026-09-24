@@ -25,7 +25,7 @@ from langgraph.graph import StateGraph, END
 from memoria import MemoriaSpazioTemporale
 from registro import RegistroDispositivi
 from prompts import TEMPLATE_INVESTIGATORE, TEMPLATE_CORRETTORE, get_prompt_comandante
-from utils import analizza_immagine_vlm, formatta_dispositivi_investigatore, ordina_e_taglia_dispositivi_comandante
+from utils import analizza_immagine_vlm, formatta_dispositivi_investigatore, ordina_e_taglia_dispositivi_comandante,genera_file_cap
 
 # --- CONFIGURAZIONI INIZIALI ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -327,6 +327,16 @@ def nodo_comandante(evento):
         print(f"Unità Umane     : {', '.join(decisione.get('unita_intervento_umano', []))}")
         print(f"Supporto IoT    : {', '.join(decisione.get('dispositivi_tattici_attivati', []))}")
         print("==================================================\n")
+        
+        cap_info = decisione.get("cap_info", {})
+        if cap_info:
+            print("---")
+            print(f"CAP Category    : {cap_info.get('category')}")
+            print(f"CAP Severity    : {cap_info.get('severity')}")
+            print(f"CAP Urgency     : {cap_info.get('urgency')}")
+        print("==================================================\n")
+        
+        genera_file_cap(decisione, epicentro_id)
         
         evento["ordine_comandante"] = decisione
 
