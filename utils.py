@@ -18,6 +18,11 @@ def genera_file_cap(decisione_json, epicentro_id, cartella_destinazione="/app/al
     severity = cap_info.get("severity", "Severe")
     certainty = cap_info.get("certainty", "Observed")
     
+    descrizione = decisione_json.get("descrizione_situazione", "Dettagli non disponibili.")
+    lat = decisione_json.get("posizione_esatta", {}).get("latitudine", 0.0)
+    lon = decisione_json.get("posizione_esatta", {}).get("longitudine", 0.0)
+    area_circle = f"{lat},{lon} 0.1"
+
     event_name = f"Allarme di tipo {category}"
     
     cap_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
@@ -34,6 +39,11 @@ def genera_file_cap(decisione_json, epicentro_id, cartella_destinazione="/app/al
     <urgency>{urgency}</urgency>
     <severity>{severity}</severity>
     <certainty>{certainty}</certainty>
+    <description>{descrizione}</description>
+    <area>
+      <areaDesc>Area Tattica Epicentro {epicentro_id}</areaDesc>
+      <circle>{area_circle}</circle>
+    </area>
   </info>
 </alert>"""
 
