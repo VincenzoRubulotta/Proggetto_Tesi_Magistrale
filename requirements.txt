@@ -10,3 +10,4 @@ langgraph
 ollama
 langchain-groq
 langchain-openai
+hashlib

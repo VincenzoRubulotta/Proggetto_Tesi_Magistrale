@@ -3,6 +3,7 @@ import math
 import json
 import base64
 import requests
+import hashlib
 from datetime import datetime, timezone
 from langchain_core.messages import HumanMessage
 
@@ -73,6 +74,12 @@ def analizza_immagine_vlm(url_immagine, vlm_model):
         risposta_http = requests.get(url_immagine, timeout=5)
         risposta_http.raise_for_status()
         
+        contenuto_immagine = risposta_http.content
+
+        md5_scaricato = hashlib.md5(contenuto_immagine).hexdigest()
+        print(f"[VLM] Immagine scaricata da {url_immagine}")
+        print(f"[VLM] MD5 file scaricato: {md5_scaricato}")
+
         image_b64 = base64.b64encode(risposta_http.content).decode("utf-8")
         
         messaggio = HumanMessage(
