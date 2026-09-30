@@ -39,7 +39,7 @@ def on_message(client_instance, userdata, msg):
             messaggio_validato = SegnaleDiVita(**dati_grezzi)
             dati_puliti = messaggio_validato.model_dump()
             gestore_registro.aggiorna_dispositivo(dati_puliti)
-            print(f"[HEARTBEAT] Aggiornato sulla mappa: {messaggio_validato.id_dispositivo} ({messaggio_validato.tipo_dispositivo})")
+            #print(f"[HEARTBEAT] Aggiornato sulla mappa: {messaggio_validato.id_dispositivo} ({messaggio_validato.tipo_dispositivo})")
             
         elif topic.startswith("smartcity/sensori/"):
             messaggio_validato = MessaggioIoT(**dati_grezzi)

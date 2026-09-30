@@ -82,13 +82,29 @@ def analizza_immagine_vlm(url_immagine, vlm_model):
 
         image_b64 = base64.b64encode(risposta_http.content).decode("utf-8")
         
+        prompt_strutturato = (
+            "You are a security analyst. Let's think step by step.\n"
+            "Step 1: Describe the background and the general environment you see.\n"
+            "Step 2: List all the objects, vehicles, or people clearly visible.\n"
+            "Step 3: Explicitly state if there are any accidents, hazards, or anomalies."
+        )
+
         messaggio = HumanMessage(
             content=[
-                {"type": "text", "text": "You are a security analyst. Describe exactly what you see in this image. Are there any accidents, hazards, vehicles, or people?"},
+                {"type": "text", "text": prompt_strutturato},
                 {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}}
             ]
         )
         risposta_vlm = vlm_model.invoke([messaggio])
+        testo_grezzo = risposta_vlm.content
+        metadati = risposta_vlm.response_metadata
+        print(f"URL Immagine: {url_immagine}")
+        print(f"Testo esatto generato:\n'{testo_grezzo}'")
+        print(f"Token in input (Letti): {metadati.get('prompt_eval_count', 'N/D')}")
+        print(f"Token in output (Generati): {metadati.get('eval_count', 'N/D')}")
+        print(f"Motivo dello stop (Done Reason): {metadati.get('done_reason', 'N/D')}")
+        print(f"==================================\n")
+        
         return risposta_vlm.content.strip()
     except Exception as e:
         print(f"[VLM] Errore durante l'analisi visiva: {e}")

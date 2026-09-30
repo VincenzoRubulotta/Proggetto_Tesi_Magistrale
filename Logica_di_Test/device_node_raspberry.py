@@ -10,7 +10,7 @@ import paho.mqtt.client as mqtt
 # CONFIGURAZIONE RETE E DISPOSITIVO
 # ==========================================
 
-IP_INFRASTRUTTURA = ""  
+IP_INFRASTRUTTURA = "192.168.1.108"  
 
 MQTT_BROKER = IP_INFRASTRUTTURA
 MQTT_PORT = 1883
@@ -37,7 +37,8 @@ def scatta_foto():
     ret, frame = cap.read()
     
     if ret:
-        cv2.imwrite(percorso_temp, frame)
+        frame_ridimensionato = cv2.resize(frame, (768, 576))
+        cv2.imwrite(percorso_temp, frame_ridimensionato, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
         print("Foto scattata e salvata con successo!")
     else:
         print("[ERRORE] Impossibile leggere il frame dalla fotocamera.")
