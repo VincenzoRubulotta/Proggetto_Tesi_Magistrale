@@ -40,7 +40,7 @@ CERTEZZE_CAP_IT = {
 
 RESPONSE_TYPE_CAP_IT = {
     "Shelter", "Evacuate", "Prepare", "Execute",
-    "Avoid", "Monitor", "Assess", "AllClear", "None"
+    "Avoid", "Monitor", "AllClear", "None"
 }
 
 

@@ -125,7 +125,7 @@ Rispondi ESCLUSIVAMENTE in formato JSON con questa esatta struttura ordinata:
     "cap_info": {{
     "category": "Scegli ESATTAMENTE uno tra: [Geo, Met, Safety, Security, Rescue, Fire, Health, Env, Transport, Infra, CBRNE, Other]",
     "event": "Descrizione sintetica della tipologia di evento",
-    "response_type": "Scegli ESATTAMENTE uno tra: [Shelter, Evacuate, Prepare, Execute, Avoid, Monitor, Assess, AllClear, None]",
+    "response_type": "Scegli ESATTAMENTE uno tra: [Shelter, Evacuate, Prepare, Execute, Avoid, Monitor, AllClear, None]",
     "urgency": "Scegli ESATTAMENTE uno tra: [Immediate, Expected, Future, Past, Unknown]",
     "severity": "Scegli ESATTAMENTE uno tra: [Extreme, Severe, Moderate, Minor, Unknown]",
     "certainty": "Scegli ESATTAMENTE uno tra: [Observed, Likely, Possible, Unlikely, Unknown]",
