@@ -4,57 +4,189 @@ import json
 import base64
 import requests
 import hashlib
+import time
+import uuid
+import xml.etree.ElementTree as ET
+
+from datetime import timedelta
+from zoneinfo import ZoneInfo
 from datetime import datetime, timezone
 from langchain_core.messages import HumanMessage
 
-def genera_file_cap(decisione_json, epicentro_id, cartella_destinazione="/app/alerts"):
-    """Genera un file XML in standard CAP 1.2 dinamico basato sull'output del Comandante."""
-    
+CAP_NS = "urn:oasis:names:tc:emergency:cap:1.2"
+ET.register_namespace("", CAP_NS)
+
+
+def _cap(tag):
+    return f"{{{CAP_NS}}}{tag}"
+
+
+CATEGORIE_CAP_IT = {
+    "Geo", "Met", "Safety", "Security", "Rescue", "Fire",
+    "Health", "Env", "Transport", "Infra", "CBRNE", "Other"
+}
+
+URGENZE_CAP_IT = {
+    "Immediate", "Expected", "Future", "Past", "Unknown"
+}
+
+SEVERITA_CAP_IT = {
+    "Extreme", "Severe", "Moderate", "Minor", "Unknown"
+}
+
+CERTEZZE_CAP_IT = {
+    "Observed", "Likely", "Possible", "Unlikely", "Unknown"
+}
+
+RESPONSE_TYPE_CAP_IT = {
+    "Shelter", "Evacuate", "Prepare", "Execute",
+    "Avoid", "Monitor", "Assess", "AllClear", "None"
+}
+
+
+def genera_file_cap(decisione_json,epicentro_id,sender="SMARTCITY-DT-PROTOTYPE",sender_name="Digital Twin Cognitivo Smart City - Prototipo",geocode_value_name=None,geocode_value=None,cartella_destinazione="/app/alerts",):
     os.makedirs(cartella_destinazione, exist_ok=True)
-    timestamp_attuale = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
-    
+
     cap_info = decisione_json.get("cap_info", {})
+
     category = cap_info.get("category", "Safety")
-    urgency = cap_info.get("urgency", "Immediate")
-    severity = cap_info.get("severity", "Severe")
-    certainty = cap_info.get("certainty", "Observed")
-    
-    descrizione = decisione_json.get("descrizione_situazione", "Dettagli non disponibili.")
-    lat = decisione_json.get("posizione_esatta", {}).get("latitudine", 0.0)
-    lon = decisione_json.get("posizione_esatta", {}).get("longitudine", 0.0)
-    area_circle = f"{lat},{lon} 0.1"
+    urgency = cap_info.get("urgency", "Unknown")
+    severity = cap_info.get("severity", "Unknown")
+    certainty = cap_info.get("certainty", "Unknown")
+    response_type = cap_info.get("response_type", "Monitor")
 
-    event_name = f"Allarme di tipo {category}"
-    
-    cap_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
-<alert xmlns="urn:oasis:names:tc:emergency:cap:1.2">
-  <identifier>{epicentro_id}</identifier>
-  <sender>SmartCity_DigitalTwin_AI</sender>
-  <sent>{timestamp_attuale}</sent>
-  <status>Actual</status>
-  <msgType>Alert</msgType>
-  <scope>Public</scope>
-  <info>
-    <category>{category}</category>
-    <event>{event_name}</event>
-    <urgency>{urgency}</urgency>
-    <severity>{severity}</severity>
-    <certainty>{certainty}</certainty>
-    <description>{descrizione}</description>
-    <area>
-      <areaDesc>Area Tattica Epicentro {epicentro_id}</areaDesc>
-      <circle>{area_circle}</circle>
-    </area>
-  </info>
-</alert>"""
+    if category not in CATEGORIE_CAP_IT:
+        category = "Other"
 
-    nome_file = f"{epicentro_id}.xml"
-    percorso_file = os.path.join(cartella_destinazione, nome_file)
-    
-    with open(percorso_file, "w", encoding="utf-8") as f:
-        f.write(cap_xml)
-        
-    print(f"[CAP GENERATOR] File standard CAP dinamico salvato: {percorso_file}")
+    if urgency not in URGENZE_CAP_IT:
+        urgency = "Unknown"
+
+    if severity not in SEVERITA_CAP_IT:
+        severity = "Unknown"
+
+    if certainty not in CERTEZZE_CAP_IT:
+        certainty = "Unknown"
+
+    if response_type not in RESPONSE_TYPE_CAP_IT:
+        response_type = "Monitor"
+
+    descrizione = decisione_json.get(
+        "descrizione_situazione",
+        "Dettagli non disponibili."
+    )
+
+    event = cap_info.get("event", f"Evento Smart City - {category}")
+    headline = cap_info.get(
+        "headline",
+        f"Allerta Smart City - {category}"
+    )[:160]
+
+    instruction = cap_info.get(
+        "instruction",
+        "Monitorare l'evoluzione dell'evento."
+    )
+
+    posizione = decisione_json.get("posizione_esatta", {})
+    lat = posizione.get("latitudine")
+    lon = posizione.get("longitudine")
+
+    identifier = str(uuid.uuid4())
+
+    status = "Test"
+
+    ora_italiana = datetime.now(ZoneInfo("Europe/Rome"))
+    sent = ora_italiana.isoformat(timespec="seconds")
+
+    expires = (ora_italiana + timedelta(hours=1)).isoformat(
+        timespec="seconds"
+    )
+
+    root = ET.Element(_cap("alert"))
+
+    ET.SubElement(root, _cap("identifier")).text = identifier
+    ET.SubElement(root, _cap("sender")).text = sender
+    ET.SubElement(root, _cap("sent")).text = sent
+    ET.SubElement(root, _cap("status")).text = status
+    ET.SubElement(root, _cap("msgType")).text = "Alert"
+    ET.SubElement(root, _cap("source")).text = "SmartCity Digital Twin"
+    ET.SubElement(root, _cap("scope")).text = "Public"
+    ET.SubElement(root, _cap("code")).text = "CAP-IT:1.0"
+
+    # CAP-IT richiede una nota circostanziata per i messaggi Test
+    ET.SubElement(root, _cap("note")).text = (
+        "Messaggio CAP-IT generato in ambiente sperimentale "
+        "nell'ambito del prototipo Digital Twin Cognitivo."
+    )
+
+    info = ET.SubElement(root, _cap("info"))
+
+    ET.SubElement(info, _cap("language")).text = "it-IT"
+    ET.SubElement(info, _cap("category")).text = category
+    ET.SubElement(info, _cap("event")).text = event
+    ET.SubElement(info, _cap("responseType")).text = response_type
+    ET.SubElement(info, _cap("urgency")).text = urgency
+    ET.SubElement(info, _cap("severity")).text = severity
+    ET.SubElement(info, _cap("certainty")).text = certainty
+
+    ET.SubElement(info, _cap("effective")).text = sent
+    ET.SubElement(info, _cap("expires")).text = expires
+
+    ET.SubElement(info, _cap("senderName")).text = sender_name
+    ET.SubElement(info, _cap("headline")).text = headline
+    ET.SubElement(info, _cap("description")).text = descrizione
+
+    if response_type in {
+        "Shelter", "Evacuate", "Prepare", "Execute",
+        "Avoid", "Monitor", "AllClear"
+    }:
+        ET.SubElement(info, _cap("instruction")).text = instruction
+
+    if lat is not None and lon is not None:
+        area = ET.SubElement(info, _cap("area"))
+
+        ET.SubElement(
+            area,
+            _cap("areaDesc")
+        ).text = f"Area tattica epicentro {epicentro_id}"
+
+        ET.SubElement(
+            area,
+            _cap("circle")
+        ).text = f"{lat},{lon} 0.1"
+
+        if geocode_value_name and geocode_value:
+            geocode = ET.SubElement(area, _cap("geocode"))
+            ET.SubElement(
+                geocode,
+                _cap("valueName")
+            ).text = geocode_value_name
+            ET.SubElement(
+                geocode,
+                _cap("value")
+            ).text = geocode_value
+
+    tree = ET.ElementTree(root)
+    ET.indent(tree, space="  ")
+
+    epoch = int(time.time())
+    nome_file = f"{sender}_{identifier}_{epoch}.xml"
+    percorso_file = os.path.join(
+        cartella_destinazione,
+        nome_file
+    )
+
+    tree.write(
+        percorso_file,
+        encoding="utf-8",
+        xml_declaration=True
+    )
+
+    print(
+        f"[CAP-IT GENERATOR] File CAP-IT sperimentale salvato: "
+        f"{percorso_file}"
+    )
+
+    return percorso_file
 
 
 def calcola_distanza(lat1, lon1, lat2, lon2):

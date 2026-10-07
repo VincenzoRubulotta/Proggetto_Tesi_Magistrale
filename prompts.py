@@ -123,10 +123,14 @@ Rispondi ESCLUSIVAMENTE in formato JSON con questa esatta struttura ordinata:
     "motivazione_tattica_iot": "Spiega la scelta finale.",
     "dispositivi_tattici_attivati": ["Elenco ID. Inserisci SOLO dispositivi con IS_MOBILE: true. Scrivi NESSUNO se non servono"],
     "cap_info": {{
-        "category": "Scegli ESATTAMENTE uno tra: [Fire, Safety, Security, Rescue, Transport, Met, Other]",
-        "urgency": "Scegli ESATTAMENTE uno tra: [Immediate, Expected, Future]",
-        "severity": "Scegli ESATTAMENTE uno tra: [Extreme, Severe, Moderate, Minor]",
-        "certainty": "Scegli ESATTAMENTE uno tra: [Observed, Likely, Possible]"
+    "category": "Scegli ESATTAMENTE uno tra: [Geo, Met, Safety, Security, Rescue, Fire, Health, Env, Transport, Infra, CBRNE, Other]",
+    "event": "Descrizione sintetica della tipologia di evento",
+    "response_type": "Scegli ESATTAMENTE uno tra: [Shelter, Evacuate, Prepare, Execute, Avoid, Monitor, Assess, AllClear, None]",
+    "urgency": "Scegli ESATTAMENTE uno tra: [Immediate, Expected, Future, Past, Unknown]",
+    "severity": "Scegli ESATTAMENTE uno tra: [Extreme, Severe, Moderate, Minor, Unknown]",
+    "certainty": "Scegli ESATTAMENTE uno tra: [Observed, Likely, Possible, Unlikely, Unknown]",
+    "headline": "Titolo sintetico dell'allerta, massimo 160 caratteri",
+    "instruction": "Eventuali istruzioni operative coerenti con response_type"
     }}
 }}
 """
