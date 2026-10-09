@@ -87,6 +87,13 @@ LANGCHAIN_API_KEY="Tua_API_Key"
 LANGCHAIN_PROJECT="SmartCity_DigitalTwin"
 ```
 
+### Cambio del Modello AI (Edge vs Cloud)
+Il sistema supporta l'esecuzione ibrida. Per cambiare il modello in uso, apri il file `AI_Orchestrator.py` e modifica la variabile `MODELLO_ATTIVO`:
+- `MODELLO_ATTIVO = "LLAMA_3B_LOCALE"` (Esecuzione Edge su Ollama)
+- `MODELLO_ATTIVO = "QWEN_3B_LOCALE"` (Esecuzione Edge su Ollama)
+- `MODELLO_ATTIVO = "GPT_20B_CLOUD"` (Esecuzione Cloud tramite API)
+
+*Nota: Se utilizzi un modello Cloud, assicurati di aver inserito le relative API Key (es. GROQ_API_KEY) nel file `.env`.*
 
 ## 3. Deploy del Sistema (Docker Compose)
 
@@ -102,15 +109,51 @@ Nel terminale, naviga nella cartella root del progetto ed esegui:
 ```bash
 docker-compose up --build
 ```
-## 4. Test e Simulazione (Logica_di_Test)
-Per testare la reazione della Macchina a Stati e dell'AI, apri un nuovo terminale, assicurati di avere le dipendenze installate, e avvia il simulatore dei sensori:
 
+## 3.1. Visualizzazione della Dashboard Real-Time
+Una volta avviati i container, la Dashboard interattiva del Digital Twin sarà disponibile via web.
+Apri il browser e collegati a:
+ **http://localhost:8080**
+
+Qui potrai monitorare in tempo reale lo stream dei log, la posizione dei dispositivi mobili (droni) e i trigger circolari sulla mappa quando l'Orchestratore decreta lo stato di CRITICO.
+
+## 3.2. Esportazione Allarmi (CAP 1.2)
+Quando il nodo Comandante conferma un'emergenza, genera in automatico un file XML aderente allo standard CAP-IT 1.2. I file XML generati vengono salvati sulla macchina Host (fuori dal container) nella cartella:
+`./Alerts_CAP/`
+
+## 4. Test e Simulazione Interattiva (Flotta IoT)
+
+Per testare la reazione della Macchina a Stati e dell'AI, il progetto include una flotta completa di dispositivi IoT simulati (telecamere, sensori ambientali e droni) pre-configurati.
+
+### 4.1 Avvio della Flotta IoT
+Apri un nuovo terminale, naviga nella cartella di test e avvia tutti i dispositivi in background (\`detached mode\`):
 ```bash
 cd Logica_di_Test
-python device_node.py
+docker-compose up -d
 ```
 
-Usa il menu interattivo nel terminale del dispositivo per innescare l'emergenza (1) o decretare il cessato allarme inviando i dati di ripristino (2).
+### 4.2 Innescare le Emergenze (Interazione con i container)
+I dispositivi simulati sono programmati per attendere un input manuale. Poiché sono eseguiti in background all'interno di container Docker, puoi interagire con le loro console utilizzando il comando docker attach.
+
+Scenario A: Innescare un'emergenza da un sensore acustico (Senza immagini)
+Collegati al terminale del microfono ambientale:
+
+```bash
+docker attach logicaditest-mic_ambientale-1
+```
+Una volta dentro, premi semplicemente INVIO. Il sensore invierà un allarme
+Sulla dashboard potrai osservare l'AI Orchestrator che, non avendo evidenze visive, metterà la zona in stato di ANOMALIA e ordinerà a una telecamera vicina o a un drone di indagare.
+Per staccarti dal terminale senza spegnere il sensore, usa la combinazione di tasti: Ctrl+P seguito da Ctrl+Q.
+
+Scenario B: Risoluzione o Conferma tramite Telecamera
+Collegati al terminale di una telecamera fissa o di un drone:
+```bash
+docker attach logicaditest-telecamera_fissa_1-1
+```
+
+Digita 1 per innescare o confermare un'emergenza (il nodo ti chiederà di selezionare un'immagine dalla cartella Data_Pool/Telecamere/CRITICO).
+Digita 2 per decretare il cessato allarme o un falso allarme (selezionando un'immagine dalla cartella NORMALE).
+Il sistema processerà l'immagine tramite il Vision Language Model e, in base al risultato visivo, il Nodo Comandante deciderà se dispiegare i droni (inviando le coordinate GPS tattiche) o ripristinare la normalità.
 
 ## 5. Arresto del Sistema
 
